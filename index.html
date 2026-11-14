@@ -1,0 +1,1092 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><style>[hidden]{display:none!important}body{margin:0}</style></head><body>
+<title>Zoom Safari</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rowdies:wght@400;700&family=Figtree:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a camera viewfinder is the stage; scoreboard rides beside it, buzzers sit along the bottom like a game-show podium. Deliberately single dark theme (night-safari). */
+:root{
+  --bg:#10222a; --panel:#173039; --line:#2a4a55; --ink:#eef4f2; --muted:#93aeb0;
+  --accent:#f2b632; --ok:#5fd18b; --bad:#ff6b5e;
+  --p1:#ff8a65; --p2:#5ec8ff; --p3:#c99bff; --p4:#7fe0b4;
+  --display:"Rowdies","Arial Rounded MT Bold",system-ui,sans-serif;
+  --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px;box-sizing:border-box}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:14px;min-height:100%}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,5vw,44px);margin:0;letter-spacing:.5px;line-height:1}
+h1 span{color:var(--accent)}
+.roundinfo{font-family:var(--mono);color:var(--muted);font-size:14px;letter-spacing:.08em;text-transform:uppercase}
+
+/* setup */
+.setup{display:grid;grid-template-columns:1.2fr 1fr;gap:20px}
+@media (max-width:760px){.setup{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.card h2{font-family:var(--display);font-weight:400;font-size:22px;margin:0}
+.lede{color:var(--muted);margin:0;line-height:1.5;max-width:60ch}
+.players{display:flex;flex-direction:column;gap:10px}
+.prow{display:grid;grid-template-columns:14px 1fr auto;gap:10px;align-items:center}
+.dot{width:14px;height:14px;border-radius:50%}
+.prow input{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--ink);font:inherit;min-width:0}
+kbd{font-family:var(--mono);font-size:13px;background:var(--bg);border:1px solid var(--line);border-bottom-width:3px;border-radius:6px;padding:3px 8px;color:var(--ink)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+#poolSeg{flex-wrap:wrap;max-width:100%}
+.seg button{background:transparent;border:0;padding:8px 14px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#1b1500;font-weight:800}
+.label{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.big{background:var(--accent);color:#1b1500;border:0;border-radius:12px;padding:14px 22px;font-family:var(--display);font-size:20px}
+.big:hover{filter:brightness(1.08)}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:10px;padding:9px 14px;color:var(--ink)}
+.rules{margin:0;padding-left:20px;color:var(--muted);line-height:1.6}
+.rules b{color:var(--ink)}
+.preview{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.preview img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;display:block}
+.note{font-size:13px;color:var(--muted)}
+
+/* game */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:18px;align-items:start}
+@media (max-width:820px){.stage{grid-template-columns:1fr}}
+.finder{position:relative;width:100%;max-width:620px;aspect-ratio:1/1;margin:0 auto;border-radius:18px;overflow:hidden;background:#081419}
+.subject{position:absolute;will-change:left,top,width,height}
+.subject img{width:100%;height:100%;object-fit:fill;display:block;max-width:none}
+.hud{position:absolute;inset:0;pointer-events:none}
+.corner{position:absolute;width:34px;height:34px;border:3px solid rgba(255,255,255,.85);filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
+.c1{top:14px;left:14px;border-right:0;border-bottom:0}.c2{top:14px;right:14px;border-left:0;border-bottom:0}
+.c3{bottom:14px;left:14px;border-right:0;border-top:0}.c4{bottom:14px;right:14px;border-left:0;border-top:0}
+.readout{position:absolute;top:18px;left:56px;right:56px;display:flex;justify-content:space-between;font-family:var(--mono);font-size:13px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8);letter-spacing:.06em}
+.rec{display:inline-flex;align-items:center;gap:6px}
+.rec::before{content:"";width:9px;height:9px;border-radius:50%;background:#d8392b;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+.reveal{position:absolute;left:0;right:0;bottom:0;padding:18px;background:linear-gradient(transparent,rgba(16,34,42,.92) 45%);text-align:center;transform:translateY(100%);transition:transform .35s ease}
+.reveal.show{transform:none}
+.reveal .name{font-family:var(--display);font-size:clamp(28px,6vw,46px);color:#fff}
+.reveal .who{color:var(--accent);font-weight:600;margin-top:2px}
+.reveal .credit{font-size:11px;color:#b9cccb;margin-top:6px;pointer-events:auto}
+.reveal .credit a{color:inherit}
+.meter{height:10px;border-radius:6px;background:var(--panel);overflow:hidden;max-width:620px;width:100%;margin:10px auto 0;border:1px solid var(--line)}
+.meter i{display:block;height:100%;background:var(--accent);width:100%;transform-origin:left}
+.worth{max-width:620px;margin:6px auto 0;display:flex;justify-content:space-between;font-family:var(--mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.side{display:flex;flex-direction:column;gap:12px}
+.scores{display:flex;flex-direction:column;gap:8px}
+.score{display:grid;grid-template-columns:6px 1fr auto;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px 10px 0;overflow:hidden;transition:transform .2s}
+.score .bar{align-self:stretch}
+.score .nm{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.score .pts{font-family:var(--mono);font-size:20px;font-variant-numeric:tabular-nums}
+.score.locked{opacity:.45}
+.score.active{border-color:var(--accent);transform:scale(1.03)}
+.tag{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--bad);margin-left:6px}
+.status{min-height:96px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;justify-content:center}
+.status .msg{font-weight:600;line-height:1.35}
+.guess{display:flex;gap:8px}
+.guess input{flex:1;min-width:0;background:var(--bg);border:2px solid var(--line);border-radius:10px;padding:12px;color:var(--ink);font:inherit;font-size:18px;font-weight:600}
+.guess input:focus{border-color:var(--accent);outline:none}
+.guess button{background:var(--accent);color:#1b1500;border:0;border-radius:10px;padding:0 16px;font-weight:800}
+.guess.right input{background:var(--ok);color:#06210f;border-color:var(--ok)}
+.guess.wrong input{background:var(--bad);color:#2a0400;border-color:var(--bad)}
+.answerclock{height:4px;border-radius:3px;background:var(--line);overflow:hidden}
+.answerclock i{display:block;height:100%;background:var(--bad);width:100%}
+.buzzers{display:grid;grid-template-columns:repeat(var(--n,2),minmax(0,1fr));gap:10px;margin-top:auto}
+.buzz{border:0;border-radius:16px;padding:16px 8px;font-family:var(--display);font-size:clamp(16px,2.6vw,22px);color:#10222a;display:flex;flex-direction:column;align-items:center;gap:4px;box-shadow:0 5px 0 rgba(0,0,0,.35);transition:transform .08s,box-shadow .08s}
+.buzz:active{transform:translateY(4px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+.buzz small{font-family:var(--mono);font-size:12px;opacity:.75}
+.buzz[disabled]{opacity:.3;cursor:not-allowed}
+.final{text-align:center;align-items:center}
+.podium{display:flex;flex-direction:column;gap:8px;width:100%;max-width:420px}
+.flash{animation:flash .5s}
+@keyframes flash{0%{box-shadow:0 0 0 0 var(--accent)}100%{box-shadow:0 0 0 18px transparent}}
+@media (prefers-reduced-motion:reduce){.rec::before{animation:none}.reveal{transition:none}.flash{animation:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Zoom <span>Safari</span></h1>
+    <div class="roundinfo" id="roundinfo">Who spots it first?</div>
+  </header>
+
+  <!-- SETUP -->
+  <section id="setup" class="setup">
+    <div class="card">
+      <h2>Players</h2>
+      <p class="lede">Each round starts on an extreme close-up of an animal and slowly zooms out. Hit your buzzer the moment you know it, then pick the right name. The earlier you buzz, the more it's worth.</p>
+      <div class="row"><span class="label">How many</span>
+        <div class="seg" id="countSeg">
+          <button type="button" data-n="1" aria-pressed="false">1</button>
+          <button type="button" data-n="2" aria-pressed="false">2</button>
+          <button type="button" data-n="3" aria-pressed="true">3</button>
+          <button type="button" data-n="4" aria-pressed="false">4</button>
+        </div>
+      </div>
+      <div class="players" id="playerInputs"></div>
+      <div class="row"><span class="label">Rounds</span>
+        <div class="seg" id="roundSeg">
+          <button type="button" data-r="8" aria-pressed="false">8</button>
+          <button type="button" data-r="12" aria-pressed="true">12</button>
+          <button type="button" data-r="20" aria-pressed="false">20</button>
+        </div>
+        <span class="label" style="margin-left:8px">Zoom speed</span>
+        <div class="seg" id="speedSeg">
+          <button type="button" data-s="26" aria-pressed="false">Slow</button>
+          <button type="button" data-s="18" aria-pressed="true">Normal</button>
+          <button type="button" data-s="11" aria-pressed="false">Fast</button>
+        </div>
+      </div>
+      <div class="row"><span class="label">Animals</span>
+        <div class="seg" id="poolSeg">
+          <button type="button" data-p="0" aria-pressed="true" id="poolAll">All</button>
+          <button type="button" data-p="1" aria-pressed="false" id="poolAf">African safari only</button>
+          <button type="button" data-p="2" aria-pressed="false" id="poolSea">Sea creatures only</button>
+          <button type="button" data-p="3" aria-pressed="false" id="poolKr">Kruger Park only</button>
+        </div>
+      </div>
+      <div class="row"><button class="big" id="startBtn" type="button">Start the safari</button></div>
+    </div>
+    <div class="card">
+      <h2>How scoring works</h2>
+      <ul class="rules">
+        <li>A correct answer is worth <b>1000</b> points at the first frame, dropping to <b>100</b> once fully zoomed out.</li>
+        <li>A wrong answer costs <b>150</b> and locks you out for the rest of that round. Everyone else keeps playing.</li>
+        <li>After buzzing you have <b>12 seconds</b> to type the animal's name and press <kbd>Enter</kbd>. Small typos and common nicknames like "hippo" count.</li>
+        <li>Type the animal's <b>exact name</b> (spelled right, as shown on the reveal) for <b>double points</b>. Capitals, spaces and punctuation don't matter.</li>
+        <li>Buzz with your key or tap your button. <kbd>Space</kbd> moves to the next animal.</li>
+      </ul>
+      <div class="label" id="trailCount">Real animal photos from Wikimedia Commons</div>
+      <div class="preview" id="preview"></div>
+      <div class="label">Use your own photos (optional)</div>
+      <div class="row">
+        <label class="ghost" for="photoInput" style="cursor:pointer">Add animal photos…</label>
+        <input id="photoInput" type="file" accept="image/*" multiple hidden>
+        <button class="ghost" id="clearPhotos" type="button" hidden>Remove photos</button>
+      </div>
+      <div class="note" id="photoNote">Name each file after its animal, like <b>snow-leopard.jpg</b>. Your photos come first in the game and never leave this browser.</div>
+    </div>
+  </section>
+
+  <!-- GAME -->
+  <section id="game" hidden>
+    <div class="stage">
+      <div>
+        <div class="finder" id="finder">
+          <div class="subject" id="subject"></div>
+          <div class="hud">
+            <div class="corner c1"></div><div class="corner c2"></div><div class="corner c3"></div><div class="corner c4"></div>
+            <div class="readout"><span class="rec" id="recLabel">LIVE</span><span id="zoomLabel">10.0×</span></div>
+          </div>
+          <div class="reveal" id="reveal"><div class="name" id="revealName"></div><div class="who" id="revealWho"></div><div class="credit" id="revealCredit"></div></div>
+        </div>
+        <div class="meter"><i id="meter"></i></div>
+        <div class="worth"><span id="worthLabel">Worth 1000</span><span id="timeLabel"></span></div>
+      </div>
+      <div class="side">
+        <div class="scores" id="scores"></div>
+        <div class="status" id="status"></div>
+      </div>
+    </div>
+    <div class="buzzers" id="buzzers" style="margin-top:14px"></div>
+  </section>
+
+  <!-- FINAL -->
+  <section id="final" class="card final" hidden>
+    <h2 id="winnerLine" style="font-size:32px"></h2>
+    <div class="podium" id="podium"></div>
+    <div class="row" style="justify-content:center">
+      <button class="big" id="againBtn" type="button">Play again</button>
+      <button class="ghost" id="setupBtn" type="button">Change players</button>
+    </div>
+  </section>
+</div>
+
+<script>
+const ANIMALS = [
+  ["Armadillo", "photos/armadillo.jpg", "birdphotos.com", "CC BY 3.0", "https://commons.wikimedia.org/wiki/File:Nine-banded_Armadillo.jpg", ""],
+  ["Badger", "photos/badger.jpg", "BadgerHero", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Badger-badger.jpg", ""],
+  ["Bear", "photos/bear.jpg", "Yathin S Krishnappa", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:2010-kodiak-bear-1.jpg", ""],
+  ["Beaver", "photos/beaver.jpg", "Steve from Washington, DC, USA", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:American_Beaver.jpg", ""],
+  ["Bison", "photos/bison.jpg", "Jack Dykinga", "Public domain", "https://commons.wikimedia.org/wiki/File:American_bison_k5680-1.jpg", ""],
+  ["Butterfly", "photos/butterfly.jpg", "Kenneth Dwain Harrelson", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Monarch_In_May.jpg", ""],
+  ["Camel", "photos/camel.jpg", "Jjron", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:07._Camel_Profile,_near_Silverton,_NSW,_07.07.2007.jpg", ""],
+  ["Cat", "photos/cat.jpg", "Alvesgaspar", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Cat_November_2010-1a.jpg", ""],
+  ["Cheetah", "photos/cheetah.jpg", "AfricanConservation", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Male_cheetah_facing_left_in_South_Africa.jpg", "af kr"],
+  ["Chicken", "photos/chicken.jpg", "Andrei Niemimäki from Turku, Finland", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Male_and_female_chicken_sitting_together.jpg", ""],
+  ["Cow", "photos/cow.jpg", "Keith Weller/USDA", "Public domain", "https://commons.wikimedia.org/wiki/File:Cow_female_black_white.jpg", ""],
+  ["Crab", "photos/crab.jpg", "Hans Hillewaert", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Carcinus_maenas.jpg", "sea"],
+  ["Crocodile", "photos/crocodile.jpg", "PG Palmer", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Crocodylus_porosus_4.jpg", ""],
+  ["Deer", "photos/deer.jpg", "Lviatour", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Cervus_elaphus_Luc_Viatour_6.jpg", ""],
+  ["Dog", "photos/dog.jpg", "M. Rehemtulla", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Huskiesatrest.jpg", ""],
+  ["Dolphin", "photos/dolphin.jpg", "NASA", "Public domain", "https://commons.wikimedia.org/wiki/File:Tursiops_truncatus_01.jpg", "sea"],
+  ["Duck", "photos/duck.jpg", "Richard Bartz", "CC BY-SA 2.5", "https://commons.wikimedia.org/wiki/File:Anas_platyrhynchos_male_female_quadrat.jpg", ""],
+  ["Eagle", "photos/eagle.jpg", "Saffron Blaze", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Bald_Eagle_Portrait.jpg", ""],
+  ["Elephant", "photos/elephant.jpg", "Muhammad Mahdi Karim", "GFDL 1.2", "https://commons.wikimedia.org/wiki/File:African_Bush_Elephant.jpg", "af kr"],
+  ["Flamingo", "photos/flamingo.jpg", "Muhammad Mahdi Karim", "GFDL 1.2", "https://commons.wikimedia.org/wiki/File:Greater_flamingo.jpg", "af"],
+  ["Fox", "photos/fox.jpg", "Joanne Redwood", "CC0", "https://commons.wikimedia.org/wiki/File:Vulpes_vulpes_ssp_fulvus.jpg", ""],
+  ["Frog", "photos/frog.jpg", "Careyjamesbalboa (Carey James Balboa)", "Public domain", "https://commons.wikimedia.org/wiki/File:Red_eyed_tree_frog_edit2.jpg", ""],
+  ["Giraffe", "photos/giraffe.jpg", "Muhammad Mahdi Karim", "GFDL 1.2", "https://commons.wikimedia.org/wiki/File:Giraffe_Mikumi_National_Park.jpg", "af kr"],
+  ["Gorilla", "photos/gorilla.jpg", "Thurundir", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Gorille_des_plaines_de_l'ouest_à_l'Espace_Zoologique.jpg", "af"],
+  ["Hedgehog", "photos/hedgehog.jpg", "Jörg Hempel", "CC BY-SA 2.0 de", "https://commons.wikimedia.org/wiki/File:Erinaceus_europaeus_LC0119.jpg", ""],
+  ["Hippopotamus", "photos/hippopotamus.jpg", "Muhammad Mahdi Karim", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Portrait_Hippopotamus_in_the_water.jpg", "af kr"],
+  ["Horse", "photos/horse.jpg", "François Marchal", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Nokota_Horses_cropped.jpg", ""],
+  ["Hyena", "photos/hyena.jpg", "Arjen Mulder", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Spotted_hyena.jpg", "af kr"],
+  ["Koala", "photos/koala.jpg", "Erik Veland", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Cutest_Koala.jpg", ""],
+  ["Lemur", "photos/lemur.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Ring-tailed_lemur_(Lemur_catta).jpg", ""],
+  ["Leopard", "photos/leopard.jpg", "Sumeet Moghe", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:African_leopard_male_(cropped).jpg", "af kr"],
+  ["Lion", "photos/lion.jpg", "Kevin Pluck", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Lion_waiting_in_Namibia.jpg", "af kr"],
+  ["Llama", "photos/llama.jpg", "kallerna", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Lama_glama_Laguna_Colorada_2.jpg", ""],
+  ["Meerkat", "photos/meerkat.jpg", "Fir0002", "GFDL 1.2", "https://commons.wikimedia.org/wiki/File:Meerkat_feb_09.jpg", "af"],
+  ["Moose", "photos/moose.jpg", "USDA Forest Service", "Public domain", "https://commons.wikimedia.org/wiki/File:Moose_superior.jpg", ""],
+  ["Octopus", "photos/octopus.jpg", "albert kok", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Octopus2.jpg", "sea"],
+  ["Orangutan", "photos/orangutan.jpg", "Eleifert", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Orang_Utan,_Semenggok_Forest_Reserve,_Sarawak,_Borneo,_Malaysia.JPG", ""],
+  ["Ostrich", "photos/ostrich.jpg", "Nicor", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Ostrich_Ngorongoro_05.jpg", "af kr"],
+  ["Otter", "photos/otter.jpg", "Mike Baird from Morro Bay, USA", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Sea_otter_cropped.jpg", "sea"],
+  ["Owl", "photos/owl.jpg", "Greg Hume", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Bubo_virginianus_06.jpg", ""],
+  ["Panda", "photos/panda.jpg", "J. Patrick Fischer", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Grosser_Panda.JPG", ""],
+  ["Parrot", "photos/parrot.jpg", "Benjamint444", "GFDL 1.2", "https://commons.wikimedia.org/wiki/File:Blue-and-Yellow-Macaw.jpg", ""],
+  ["Peacock", "photos/peacock.jpg", "Jatin Sindhu", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Peacock_Plumage.jpg", ""],
+  ["Penguin", "photos/penguin.jpg", "Ian Duffy from UK", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Aptenodytes_forsteri_-Snow_Hill_Island,_Antarctica_-adults_and_juvenile-8.jpg", "sea"],
+  ["Pig", "photos/pig.jpg", "kallerna", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Pig_farm_Vampula_9.jpg", ""],
+  ["Polar bear", "photos/polar-bear.jpg", "Alan Wilson", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Polar_Bear_-_Alaska_(cropped).jpg", ""],
+  ["Rabbit", "photos/rabbit.jpg", "Larry D. Moore", "CC BY 4.0", "https://commons.wikimedia.org/wiki/File:Rabbit_in_montana.jpg", ""],
+  ["Raccoon", "photos/raccoon.jpg", "Unknown author", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Procyon_lotor_(raccoon).jpg", ""],
+  ["Red panda", "photos/red-panda.jpg", "Greg Hume", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:RedPandaFullBody.JPG", ""],
+  ["Rhinoceros", "photos/rhinoceros.jpg", "Jonathunder", "GFDL 1.2", "https://commons.wikimedia.org/wiki/File:Diceros_bicornis.jpg", "af kr"],
+  ["Shark", "photos/shark.jpg", "Terry Goss", "CC BY 2.5", "https://commons.wikimedia.org/wiki/File:White_shark.jpg", "sea"],
+  ["Sheep", "photos/sheep.jpg", "Keith Weller", "Public domain", "https://commons.wikimedia.org/wiki/File:Flock_of_sheep.jpg", ""],
+  ["Snail", "photos/snail.jpg", "Jürgen Schoner", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Grapevinesnail_01.jpg", ""],
+  ["Swan", "photos/swan.jpg", "Yerpo", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Mute_swan_Vrhnika.jpg", ""],
+  ["Tiger", "photos/tiger.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Walking_tiger_female.jpg", ""],
+  ["Turkey", "photos/turkey.jpg", "Dimus", "Public domain", "https://commons.wikimedia.org/wiki/File:Wild_turkey_eastern_us.jpg", ""],
+  ["Turtle", "photos/turtle.jpg", "Brocken Inaglory", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Chelonia_mydas_is_going_for_the_air_edit.jpg", "sea"],
+  ["Whale", "photos/whale.jpg", "Whit Welles Wwelles14", "CC BY 3.0", "https://commons.wikimedia.org/wiki/File:Humpback_stellwagen_edit.jpg", "sea"],
+  ["Wolf", "photos/wolf.jpg", "Mas3cf", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Eurasian_wolf_2.jpg", ""],
+  ["Zebra", "photos/zebra.jpg", "Muhammad Mahdi Karim", "GFDL 1.2", "https://commons.wikimedia.org/wiki/File:Plains_Zebra_Equus_quagga.jpg", "af kr"],
+  ["Secretary bird", "photos/secretary-bird.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Secretario_(Sagittarius_serpentarius),_parque_nacional_de_Amboseli,_Kenia,_2024-05-23,_DD_13.jpg", "af kr"],
+  ["Marabou stork", "photos/marabou-stork.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Marabou_stork_(Leptoptilos_crumenifer)_head.jpg", "af kr"],
+  ["Crowned crane", "photos/crowned-crane.jpg", "Luc Viatour", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Balearica_regulorum_1_Luc_Viatour.jpg", "af"],
+  ["Lilac-breasted roller", "photos/lilac-breasted-roller.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Lilac-breasted_roller_(Coracias_caudatus_caudatus)_Botswana_(cropped).jpg", "af kr"],
+  ["Vulture", "photos/vulture.jpg", "NJR ZA", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Cape_Vulture-001.jpg", "af kr"],
+  ["Fish eagle", "photos/fish-eagle.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:African_fish_eagle_(Haliaeetus_vocifer)_Ethiopia.jpg", "af kr"],
+  ["Hamerkop", "photos/hamerkop.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Hamerkop_(Scopus_umbretta_umbretta)_2.jpg", "af kr"],
+  ["Starling", "photos/starling.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Cape_starling_(Lamprotornis_nitens)_Kruger.jpg", "af kr"],
+  ["Guineafowl", "photos/guineafowl.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Gallina_de_Guinea_(Numida_meleagris),_parque_nacional_Kruger,_Sudáfrica,_2018-07-25,_DD_48.jpg", "af kr"],
+  ["Weaver bird", "photos/weaver-bird.jpg", "Giles Laurent", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:002_Black-headed_weaver_building_its_nest_at_Kibale_forest_National_Park_Photo_by_Giles_Laurent.jpg", "af"],
+  ["Saddle-billed stork", "photos/saddle-billed-stork.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Jabirú_africano_(Ephippiorhynchus_senegalensis),_delta_del_Okavango,_Botsuana,_2018-07-31,_DD_11.jpg", "af kr"],
+  ["Bateleur eagle", "photos/bateleur-eagle.jpg", "frielp", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Bateleur_Eagle.jpg", "af kr"],
+  ["Hornbill", "photos/hornbill.jpg", "Giles Laurent", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:155_Southern_yellow-billed_hornbill_in_Etosha_National_Park_Photo_by_Giles_Laurent.jpg", "af kr"],
+  ["Egyptian goose", "photos/egyptian-goose.jpg", "Carlos Delgado", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Alopochen_aegyptiacus_-_01.jpg", "af kr"],
+  ["Monitor lizard", "photos/monitor-lizard.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Nile_monitor_lizard_(Varanus_niloticus)_head.jpg", "af kr"],
+  ["Mamba", "photos/mamba.jpg", "Holger Krisp", "CC BY 3.0", "https://commons.wikimedia.org/wiki/File:Mamba_Dendroaspis_angusticeps.jpg", "af"],
+  ["Agama lizard", "photos/agama-lizard.jpg", "Chris_huh", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Red-headed_Rock_Agama.jpg", "af"],
+  ["Toucan", "photos/toucan.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Keel-billed_toucan_(Ramphastos_sulfuratus_sulfuratus)_on_foxtail_palm_(Wodyetia_bifurcata)_Cayo.jpg", ""],
+  ["Hummingbird", "photos/hummingbird.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Anna's_hummingbird_(Calypte_anna)_male_in_flight_Campbell_River.jpg", ""],
+  ["Kingfisher", "photos/kingfisher.jpg", "Giles Laurent", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:024_Male_green_kingfisher_in_Encontro_das_Águas_State_Park_Photo_by_Giles_Laurent.jpg", ""],
+  ["Puffin", "photos/puffin.jpg", "Andreas Trepte", "CC BY-SA 2.5", "https://commons.wikimedia.org/wiki/File:Atlantic_Puffin_Fratercula_arctica.jpg", ""],
+  ["Woodpecker", "photos/woodpecker.jpg", "Rhododendrites", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Downy_woodpecker_in_GWC_(33941).jpg", ""],
+  ["Robin", "photos/robin.jpg", "Francis C. Franklin", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Erithacus_rubecula_with_cocked_head.jpg", ""],
+  ["Seagull", "photos/seagull.jpg", "Rhododendrites", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:American_Herring_Gull,_Brooklyn_Army_Terminal_(01813).jpg", ""],
+  ["Pigeon", "photos/pigeon.jpg", "Dori", "CC BY-SA 3.0 us", "https://commons.wikimedia.org/wiki/File:Pigeon_portrait_4861.jpg", ""],
+  ["Pelican", "photos/pelican.jpg", "Calibas", "CC BY 3.0", "https://commons.wikimedia.org/wiki/File:Brown_Pelican3.jpg", ""],
+  ["Egret", "photos/egret.jpg", "Tomascastelazo", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Ardea_alba_in_mangrove.jpg", ""],
+  ["Snowy owl", "photos/snowy-owl.jpg", "H. Zell", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Bubo_scandiacus_-_Karlsruhe_Zoo_01.jpg", ""],
+  ["Bee", "photos/bee.jpg", "Luc Viatour", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Apis_mellifera_2_Luc_Viatour.JPG", ""],
+  ["Bumblebee", "photos/bumblebee.jpg", "Richard Bartz", "CC BY-SA 2.5", "https://commons.wikimedia.org/wiki/File:Apinae_Bombus_pascuorum.jpg", ""],
+  ["Dragonfly", "photos/dragonfly.jpg", "Alandmanson", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Anax_imperator_2015_11_23_6807_(cropped).jpg", ""],
+  ["Praying mantis", "photos/praying-mantis.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:European_praying_mantis_(Mantis_religiosa)_green_female_Dobruja.jpg", ""],
+  ["Grasshopper", "photos/grasshopper.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Egyptian_grasshopper_(Anacridium_aegyptium)_on_crab_apple_(Malus_sylvestris)_Corfu.jpg", ""],
+  ["Spider", "photos/spider.jpg", "Basile Morin", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Plexippus_petersi_(jumping_spider)_on_a_human_finger_at_golden_hour.jpg", ""],
+  ["Jellyfish", "photos/jellyfish.jpg", "Alexander Vasenin", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Moon_jellyfish_at_Gota_Sagher.JPG", "sea"],
+  ["Starfish", "photos/starfish.jpg", "Matt Kieffer", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Crown_of_Thorns_Starfish_at_Malapascuas_Island_v._II.jpg", "sea"],
+  ["Seahorse", "photos/seahorse.jpg", "Hans Hillewaert", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Hippocampus_hippocampus_(on_Ascophyllum_nodosum).jpg", "sea"],
+  ["Clownfish", "photos/clownfish.jpg", "Nick Hobgood", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Amphiprion_ocellaris_(Clown_anemonefish)_by_Nick_Hobgood.jpg", "sea"],
+  ["Manta ray", "photos/manta-ray.jpg", "Arturo de Frias Marques", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Giant_Manta_AdF.jpg", "sea"],
+  ["Komodo dragon", "photos/komodo-dragon.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Komodo_dragon_(Varanus_komodoensis).jpg", ""],
+  ["Iguana", "photos/iguana.jpg", "Wilfredor", "CC0", "https://commons.wikimedia.org/wiki/File:Iguana_Iguana_from_Margarita_Island.jpg", ""],
+  ["Gecko", "photos/gecko.jpg", "Brocken Inaglory", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Gold_dust_day_gecko.JPG", ""],
+  ["Rattlesnake", "photos/rattlesnake.jpg", "Holger Krisp", "CC BY 3.0", "https://commons.wikimedia.org/wiki/File:Crotalus_atrox_diamantklapperschlange_kopf.jpg", ""],
+  ["Cobra", "photos/cobra.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Monocled_cobra_(Naja_kaouthia)_Bach_Ma_2.jpg", ""],
+  ["Tortoise", "photos/tortoise.jpg", "Bernard Gagnon", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Chelonoidis_vicina_04.jpg", ""],
+  ["Toad", "photos/toad.jpg", "George Chernilevsky", "Public domain", "https://commons.wikimedia.org/wiki/File:Bufo_bufo_2009_G1.jpg", ""],
+  ["Cuttlefish", "photos/cuttlefish.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Sepia_común_(Sepia_officinalis),_Parque_natural_de_la_Arrábida,_Portugal,_2020-07-21,_DD_62.jpg", "sea"],
+  ["Chameleon", "photos/chameleon.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Flap-necked_chameleon_(Chamaeleo_dilepis)_female_2.jpg", "af kr"],
+  ["Mantis shrimp", "photos/mantis-shrimp.jpg", "Alexander Vasenin", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Curious_mantis_shrimp_from_Gilli_Banta_reef.JPG", "sea"],
+  ["Cape buffalo", "photos/cape-buffalo.jpg", "Giles Laurent", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:029_African_buffalo_in_the_Serengeti_National_Park_Photo_by_Giles_Laurent.jpg", "af kr"],
+  ["Wildebeest", "photos/wildebeest.jpg", "Muhammad Mahdi Karim", "GFDL 1.2", "https://commons.wikimedia.org/wiki/File:Blue_Wildebeest,_Ngorongoro.jpg", "af kr"],
+  ["Impala", "photos/impala.jpg", "Hans Hillewaert", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Aepyceros_melampus_petersi_♂.jpg", "af kr"],
+  ["Thomson's gazelle", "photos/thomson-s-gazelle.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Gacela_de_Thomson_(Eudorcas_thomsonii),_parque_nacional_de_Amboseli,_Kenia,_2024-05-23,_DD_11.jpg", "af"],
+  ["Warthog", "photos/warthog.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Southern_warthog_(Phacochoerus_africanus_sundevallii)_male.jpg", "af kr"],
+  ["Kudu", "photos/kudu.jpg", "Hans Hillewaert", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Tragelaphus_strepsiceros_♂_(head).jpg", "af kr"],
+  ["Eland", "photos/eland.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Eland_común_(Taurotragus_oryx),_reserva_natural_Masái_Mara,_Kenia,_2024-05-20,_DD_08.jpg", "af kr"],
+  ["Oryx", "photos/oryx.jpg", "Yathin S Krishnappa", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Oryx_gazella_-_Etosha_2014.jpg", "af"],
+  ["Springbok", "photos/springbok.jpg", "Yathin S Krishnappa", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Antidorcas_marsupialis,_male_(Etosha,_2012).jpg", "af"],
+  ["Topi", "photos/topi.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Topi_(Damaliscus_lunatus_jimela)_female.jpg", "af kr"],
+  ["Waterbuck", "photos/waterbuck.jpg", "Yathin S Krishnappa", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Kobus_ellipsiprymnus_(Kruger,_2012).jpg", "af kr"],
+  ["Dik-dik", "photos/dik-dik.jpg", "Yathin S Krishnappa", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Madoqua_kirkii_-_female_(Namutoni).jpg", "af"],
+  ["Sable antelope", "photos/sable-antelope.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Sable_antelope_(Hippotragus_niger)_adult_male.jpg", "af kr"],
+  ["Roan antelope", "photos/roan-antelope.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Roan_antelope_(Hippotragus_equinus_koba).jpg", "af kr"],
+  ["Serval", "photos/serval.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Serval_(Leptailurus_serval),_parque_nacional_de_Tarangire,_Tanzania,_2024-05-25,_DD_54.jpg", "af kr"],
+  ["Caracal", "photos/caracal.jpg", "Leo za1", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Caracal_Caracal-001.jpg", "af kr"],
+  ["Jackal", "photos/jackal.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Chacal_de_lomo_negro_(Lupulella_mesomelas),_reserva_natural_Masái_Mara,_Kenia,_2024-05-20,_DD_07.jpg", "af kr"],
+  ["Mongoose", "photos/mongoose.jpg", "Nagarjun", "CC BY 4.0", "https://commons.wikimedia.org/wiki/File:Yellow_mongoose_-_Kgalagadi_National_Park,_South_Africa.jpg", "af"],
+  ["Baboon", "photos/baboon.jpg", "Giles Laurent", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:044_Olive_baboon_with_baby_on_the_back_in_the_Serengeti_National_Park_Photo_by_Giles_Laurent.jpg", "af"],
+  ["Vervet monkey", "photos/vervet-monkey.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Cercopiteco_verde_(Chlorocebus_pygerythrus),_parque_nacional_de_Tarangire,_Tanzania,_2024-05-24,_DD_02.jpg", "af kr"],
+  ["Colobus monkey", "photos/colobus-monkey.jpg", "William Warby", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Colobus_guereza_Lagos_Zoo_Portugal.jpg", "af"],
+  ["Rock hyrax", "photos/rock-hyrax.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Rock_hyrax_(Procavia_capensis).jpg", "af kr"],
+  ["Chimpanzee", "photos/chimpanzee.jpg", "Friedrich Böhringer", "CC BY-SA 2.5", "https://commons.wikimedia.org/wiki/File:Schimpanse,_Pan_troglodytes_3.JPG", "af"],
+  ["Ground squirrel", "photos/ground-squirrel.jpg", "Hans Hillewaert", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Xerus_inauris.jpg", "af"],
+  ["Turaco", "photos/turaco.jpg", "Giles Laurent", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:017_Great_blue_turaco_at_Kibale_forest_National_Park_Photo_by_Giles_Laurent.jpg", "af"],
+  ["Goliath heron", "photos/goliath-heron.jpg", "H. Zell", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Ardea_goliath_-_Réserve_africaine_de_Sigean_04.jpg", "af kr"],
+  ["Puff adder", "photos/puff-adder.jpg", "Julius Rückert", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Bitis_arietans.jpg", "af kr"],
+  ["Barbet", "photos/barbet.jpg", "Giles Laurent", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:028_Usambiro_barbet_in_the_Serengeti_National_Park_Photo_by_Giles_Laurent.jpg", "af"],
+  ["Samango monkey", "photos/samango-monkey.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Samango_monkey_(Cercopithecus_mitis_erythrarchus)_Mount_Sheba.jpg", "af kr"],
+  ["Kob", "photos/kob.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Ugandan_kobs_(Kobus_kob_thomasi)_female_and_calf.jpg", "af"],
+  ["Bee-eater", "photos/bee-eater.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Little_bee-eater_(Merops_pusillus_argutus)_Namibia.jpg", "af kr"],
+  ["Kangaroo", "photos/kangaroo.jpg", "Toby Hudson", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Eastern_Grey_Kangaroo_Feeding_edited.jpg", ""],
+  ["Squirrel", "photos/squirrel.jpg", "Rhododendrites", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Red_squirrel_(21808).jpg", ""],
+  ["Chipmunk", "photos/chipmunk.jpg", "Rhododendrites", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Chipmunk_with_stuffed_cheeks_in_Prospect_Park_(05980).jpg", ""],
+  ["Sloth", "photos/sloth.jpg", "Stefan Laube (Tauchgurke)", "Public domain", "https://commons.wikimedia.org/wiki/File:Bradypus.jpg", ""],
+  ["Ibex", "photos/ibex.jpg", "Isiwal", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Alpensteinbock_Capra_ibex-0801.jpg", ""],
+  ["Snow leopard", "photos/snow-leopard.jpg", "Tambako The Jaguar", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Snow_leopard_portrait-2010-07-09.jpg", ""],
+  ["Jaguar", "photos/jaguar.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Jaguar_(Panthera_onca_palustris)_male_Rio_Negro_2.JPG", ""],
+  ["Puma", "photos/puma.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Puma_(Puma_concolor_concolor)_female_Leona_Amarga.jpg", ""],
+  ["Lynx", "photos/lynx.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Lince_ibérico_(Lynx_pardinus),_Almuradiel,_Ciudad_Real,_España,_2021-12-19,_DD_02.jpg", ""],
+  ["Tapir", "photos/tapir.jpg", "Rhododendrites", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Baird's_tapir_mother_with_baby_(92151).jpg", ""],
+  ["Capybara", "photos/capybara.jpg", "Clodomiro Esteves Junior", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Capivara(Hydrochoerus_hydrochaeris).jpg", ""],
+  ["Platypus", "photos/platypus.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Duck-billed_platypus_(Ornithorhynchus_anatinus)_Scottsdale.jpg", ""],
+  ["Wombat", "photos/wombat.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Common_wombat_(Vombatus_ursinus_tasmaniensis)_juvenile_Maria_Island.jpg", ""],
+  ["Sea lion", "photos/sea-lion.jpg", "Bernard Gagnon", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Galápagos_sea_lions,_Santa_Fe_Island_03.jpg", "sea"],
+  ["Reindeer", "photos/reindeer.jpg", "Arild Vågen", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Reindeer_Ljungris_October_2014_02.jpg", ""],
+  ["Donkey", "photos/donkey.jpg", "Lilly M", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Equus_asinus_Kadzidłowo_001.jpg", ""],
+  ["Seal", "photos/seal.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Common_seal_(Phoca_vitulina)_2.jpg", "sea"],
+  ["Echidna", "photos/echidna.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Short-beaked_echidna_(Tachyglossus_aculeatus_setosus)_Scottsdale.jpg", ""],
+  ["Tarsier", "photos/tarsier.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Philippine_tarsier_(Carlito_syrichta_fraterculus)_Bohol.jpg", ""],
+  ["Yak", "photos/yak.jpg", "travelwayoflife", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Bos_grunniens_at_Letdar_on_Annapurna_Circuit.jpg", ""],
+  ["Musk ox", "photos/musk-ox.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Muskox_(Ovibos_moschatus)_male_Dovrefjell_1.jpg", ""],
+  ["Proboscis monkey", "photos/proboscis-monkey.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Proboscis_monkey_(Nasalis_larvatus)_female_Labuk_Bay.jpg", ""],
+  ["Nile crocodile", "photos/nile-crocodile.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Cocodrilo_del_Nilo_(Crocodylus_niloticus),_reserva_natural_Masái_Mara,_Kenia,_2024-05-20,_DD_70.jpg", "af kr"],
+  ["African wild dog", "photos/african-wild-dog.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:African_wild_dog_(Lycaon_pictus_pictus)_play_fighting.jpg", "af kr"],
+  ["Aardvark", "photos/aardvark.jpg", "MontageMan", "CC BY 2.5", "https://commons.wikimedia.org/wiki/File:Porc_formiguer.JPG", "af kr"],
+  ["Pangolin", "photos/pangolin.jpg", "David Brossard", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Ground_Pangolin_at_Madikwe_Game_Reserve.jpg", "af kr"],
+  ["Honey badger", "photos/honey-badger.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Honey_Badger_(Mellivora_capensis)_(17425848662).jpg", "af kr"],
+  ["Bat-eared fox", "photos/bat-eared-fox.jpg", "Joanne Goldby", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Bat_eared_fox_Kenya_crop.jpg", "af"],
+  ["Aardwolf", "photos/aardwolf.jpg", "by Dkaeuferle = Dominik Käuferle", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Proteles_cristatus1.jpg", "af kr"],
+  ["Genet", "photos/genet.jpg", "Frédéric SALEIN", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:A_female_common_genet_in_the_dining_room,_Satao_Camp,_Tsavo_East.jpg", "af kr"],
+  ["African civet", "photos/african-civet.jpg", "Николай Усик / http://paradoxusik.livejournal.com/", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Civettictis_civetta_11.jpg", "af kr"],
+  ["Gerenuk", "photos/gerenuk.jpg", "By Aaron Logan", "CC BY 1.0", "https://commons.wikimedia.org/wiki/File:Lightmatter_gerenuk.jpg", "af"],
+  ["Nyala", "photos/nyala.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Nyala_(Tragelaphus_angasii)_female.jpg", "af kr"],
+  ["Bushbuck", "photos/bushbuck.jpg", "Hans Hillewaert", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Tragelaphus_scriptus_(male).jpg", "af kr"],
+  ["Bongo", "photos/bongo.jpg", "Patrick Coin (Patrick Coin)", "CC BY-SA 2.5", "https://commons.wikimedia.org/wiki/File:Tragelaphus_eurycerus_isaaciPCCA20071227-8374B.jpg", "af"],
+  ["Grant's gazelle", "photos/grant-s-gazelle.jpg", "Ikiwaner", "GFDL 1.2", "https://commons.wikimedia.org/wiki/File:Ngorongoro_Grant-Gazelle.jpg", "af"],
+  ["Hartebeest", "photos/hartebeest.jpg", "William Warby", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Alcelaphus_buselaphus,_Ngorongoro,_Tanzania.jpg", "af"],
+  ["Klipspringer", "photos/klipspringer.jpg", "Munificent", "CC BY 2.5", "https://commons.wikimedia.org/wiki/File:Klipspringer.jpg", "af kr"],
+  ["Steenbok", "photos/steenbok.jpg", "Hans Hillewaert", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Raphicerus_campestris.jpg", "af kr"],
+  ["Duiker", "photos/duiker.jpg", "Chuckupd at English Wikipedia", "Public domain", "https://commons.wikimedia.org/wiki/File:Common_duiker_kenya.jpg", "af kr"],
+  ["Reedbuck", "photos/reedbuck.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Southern_Reedbuck_(Redunca_arundinum)_iSimangaliso_Wetland_Park,_KwaZulu-Natal,_South_Africa.jpg", "af kr"],
+  ["Red lechwe", "photos/red-lechwe.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Red_lechwe_(Kobus_leche_leche)_male.jpg", "af"],
+  ["Black wildebeest", "photos/black-wildebeest.jpg", "Vassil", "Public domain", "https://commons.wikimedia.org/wiki/File:Gnou_Thoiry_19803.jpg", "af"],
+  ["Grevy's zebra", "photos/grevy-s-zebra.jpg", "Rainbirder", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Grevy's_Zebra_Stallion.jpg", "af"],
+  ["Okapi", "photos/okapi.jpg", "Daniel Jolivet", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Saint-Aignan_(Loir-et-Cher)._Okapi.jpg", "af"],
+  ["Bushpig", "photos/bushpig.jpg", "Michal Sloviak", "CC BY 4.0", "https://commons.wikimedia.org/wiki/File:Potamochoerus_larvatus_43594615.jpg", "af kr"],
+  ["Brown hyena", "photos/brown-hyena.jpg", "southafrica.net", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Parahyaena_brunnea_5.jpg", "af"],
+  ["Striped hyena", "photos/striped-hyena.jpg", "Sumeet Moghe", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Striped_Hyena_Adult.jpg", "af"],
+  ["Cape fox", "photos/cape-fox.jpg", "Yathin S Krishnappa", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Vulpes_chama_(Etosha).jpg", "af"],
+  ["African golden wolf", "photos/african-golden-wolf.jpg", "mourad-harzallah", "CC BY 4.0", "https://commons.wikimedia.org/wiki/File:Grey_jackal_from_Haizer_Algeria_4.jpeg", "af"],
+  ["Ethiopian wolf", "photos/ethiopian-wolf.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Ethiopian_wolf_(Canis_simensis_citernii)_2.jpg", "af"],
+  ["Banded mongoose", "photos/banded-mongoose.jpg", "D. Gordon E. Robertson", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Banded_Mongoose.jpg", "af kr"],
+  ["Dwarf mongoose", "photos/dwarf-mongoose.jpg", "Hans Hillewaert", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Helogale_parvula.jpg", "af kr"],
+  ["Springhare", "photos/springhare.jpg", "Devonpike at English Wikipedia", "Public domain", "https://commons.wikimedia.org/wiki/File:Springharelg.jpg", "af kr"],
+  ["Porcupine", "photos/porcupine.jpg", "MarianSz", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Stachelschwein2.jpg", "af kr"],
+  ["Cape fur seal", "photos/cape-fur-seal.jpg", "Hans Hillewaert", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Arctocephalus_pusillus_2.jpg", "af sea"],
+  ["Gelada", "photos/gelada.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Southern_gelada_(Theropithecus_gelada_obscura)_female_with_baby.jpg", "af"],
+  ["Red colobus", "photos/red-colobus.jpg", "Giles Laurent", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:008_Red_colobus_mother_carrying_her_baby_at_Kibale_forest_National_Park_Photo_by_Giles_Laurent.jpg", "af"],
+  ["Blue monkey", "photos/blue-monkey.jpg", "Pedro Gonnet", "CC BY 2.5", "https://commons.wikimedia.org/wiki/File:BlueMonkey.jpg", "af"],
+  ["Red-tailed monkey", "photos/red-tailed-monkey.jpg", "Denise", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Red-tailed_monkey_profile.jpg", "af"],
+  ["Patas monkey", "photos/patas-monkey.jpg", "alex roberts from San Francisco, USA", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Patas_Monkey_Jr.jpg", "af"],
+  ["De Brazza's monkey", "photos/de-brazza-s-monkey.jpg", "Hans Hillewaert", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Cercopithecus_neglectus.jpg", "af"],
+  ["Bonobo", "photos/bonobo.jpg", "DBeaune", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Les_bonobos_utilisent_certaines_feuilles_aux_vertus_pharmacologique_contre_leurs_parasites_intestinaux.jpg", "af"],
+  ["Kori bustard", "photos/kori-bustard.jpg", "Winfried Bruenken (Amrum)", "CC BY-SA 2.5", "https://commons.wikimedia.org/wiki/File:Ardeotis_kori_Etosha.JPG", "af kr"],
+  ["Ground hornbill", "photos/ground-hornbill.jpg", "Hans Hillewaert", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Bucorvus_leadbeateri_(Mfuwe).jpg", "af kr"],
+  ["Shoebill", "photos/shoebill.jpg", "https://www.flickr.com/photos/zeroexposure/", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Entebbe_Shoe_Bill_Stork.jpg", "af"],
+  ["Martial eagle", "photos/martial-eagle.jpg", "Thomas Fuhrmann", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Serengeti_National_Park_2021-09_-_Polemaetus_bellicosus_-_martial_eagle.jpg", "af kr"],
+  ["Tawny eagle", "photos/tawny-eagle.jpg", "Bernard DUPONT", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Tawny_Eagle_(Aquila_rapax)_with_full_crop.jpg", "af kr"],
+  ["Lappet-faced vulture", "photos/lappet-faced-vulture.jpg", "Tawaye", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Le_vautour_à_tête_blanche_2024.jpg", "af kr"],
+  ["Eagle-owl", "photos/eagle-owl.jpg", "Yathin S Krishnappa", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:2012-giant-eagle-owl.jpg", "af kr"],
+  ["Go-away-bird", "photos/go-away-bird.jpg", "Axel Tschentscher", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Grey_Go-Away-Bird_Group.jpg", "af kr"],
+  ["Lovebird", "photos/lovebird.jpg", "Giles Laurent", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:046_Fischer's_lovebird_in_the_Serengeti_National_Park_Photo_by_Giles_Laurent.jpg", "af"],
+  ["African grey parrot", "photos/african-grey-parrot.jpg", "Robert01", "CC BY-SA 3.0 de", "https://commons.wikimedia.org/wiki/File:Psittacus_erithacus_-flying-8a.jpg", "af"],
+  ["Purple roller", "photos/purple-roller.jpg", "Thomas Schoch", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Coracias_naevia.jpg", "af kr"],
+  ["Malachite kingfisher", "photos/malachite-kingfisher.jpg", "Sumeet Moghe", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Malachite_Kingfisher_-_Portrait.jpg", "af kr"],
+  ["Pied kingfisher", "photos/pied-kingfisher.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Pied_kingfisher_(Ceryle_rudis_rudis)_male.jpg", "af kr"],
+  ["Carmine bee-eater", "photos/carmine-bee-eater.jpg", "Lip Kee from Singapore, Republic of Singapore", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Merops_nubicoides,_Khwai,_Botswana_1.jpg", "af kr"],
+  ["Superb starling", "photos/superb-starling.jpg", "Sumeet Moghe", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Superb_Starling_Portrait.jpg", "af"],
+  ["Oxpecker", "photos/oxpecker.jpg", "Profberger at English Wikipedia", "CC BY 2.5", "https://commons.wikimedia.org/wiki/File:Red_billed_oxpecker_close.jpg", "af kr"],
+  ["Red bishop", "photos/red-bishop.jpg", "Derek Keats from South Africa", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Southern_Red_Bishop_or_Red_Bishop_(Euplectes_orix)_(1).jpg", "af kr"],
+  ["Widowbird", "photos/widowbird.jpg", "Mohanr53 at English Wikipedia", "Public domain", "https://commons.wikimedia.org/wiki/File:Euplectes_progne_male_South_Africa_cropped.jpg", "af"],
+  ["Whydah", "photos/whydah.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Pin-tailed_whydah_(Vidua_macroura)_breeding_male.jpg", "af kr"],
+  ["Paradise flycatcher", "photos/paradise-flycatcher.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:African_paradise-flycatcher_(Terpsiphone_viridis)_rufous_morph_female.jpg", "af kr"],
+  ["Crimson-breasted shrike", "photos/crimson-breasted-shrike.jpg", "Derek Keats from South Africa", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Laniarius_atrococcineus_-Pretoria,_South_Africa-8_(2).jpg", "af"],
+  ["Sunbird", "photos/sunbird.jpg", "Steve Garvie from Dunfermline, Fife, Scotland", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Nectarinia_famosa_(Malachite_Sunbird).jpg", "af"],
+  ["Hoopoe", "photos/hoopoe.jpg", "Luc Viatour", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Upupa_epops_3_Luc_Viatour.jpg", "af kr"],
+  ["Wood hoopoe", "photos/wood-hoopoe.jpg", "hyper7pro from Secunda, South Africa", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Phoeniculus_purpureus_-South_Africa-8a.jpg", "af kr"],
+  ["Jacana", "photos/jacana.jpg", "Chris Eason", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:African_Jacana_(Actophilornis_africanus).jpg", "af kr"],
+  ["Blacksmith lapwing", "photos/blacksmith-lapwing.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Avefría_armada_(Vanellus_armatus),_parque_nacional_de_Chobe,_Botsuana,_2018-07-28,_DD_70.jpg", "af kr"],
+  ["Crowned lapwing", "photos/crowned-lapwing.jpg", "Muhammad Mahdi Karim", "GFDL 1.2", "https://commons.wikimedia.org/wiki/File:Crowned_Lapwing_(Vanellus_coronatus)_Mikumi_shadow_lift.jpg", "af kr"],
+  ["Spoonbill", "photos/spoonbill.jpg", "Bjørn Christian Tørrissen", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Platalea-alba-Lake-Nakuru.JPG", "af kr"],
+  ["Hadeda ibis", "photos/hadeda-ibis.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Ibis_hadada_(Bostrychia_hagedash),_parque_nacional_de_Tarangire,_Tanzania,_2024-05-24,_DD_23.jpg", "af kr"],
+  ["Sacred ibis", "photos/sacred-ibis.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Sacred_ibis_(Threskiornis_aethiopicus).jpg", "af kr"],
+  ["Yellow-billed stork", "photos/yellow-billed-stork.jpg", "Timothy A. Gonsalves", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Yellow-billed_Stork_Breeding_Perched_Lupande_Jul23_A7R_06298.jpg", "af kr"],
+  ["Great white pelican", "photos/great-white-pelican.jpg", "Zeynel Cebeci", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Pelecanus_onocrotalus_-_Great_White_Pelican_01.jpg", "af kr"],
+  ["Lesser flamingo", "photos/lesser-flamingo.jpg", "Charles J. Sharp", "CC BY 2.5", "https://commons.wikimedia.org/wiki/File:Lesser-flamingos.jpg", "af"],
+  ["African darter", "photos/african-darter.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Pato_aguja_africano_(Anhinga_rufa),_parque_nacional_de_Chobe,_Botsuana,_2018-07-28,_DD_46.jpg", "af kr"],
+  ["Cattle egret", "photos/cattle-egret.jpg", "El Golli Mohamed", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Héron_garde_boeufs_à_Oued_Mejerda.jpg", "af kr"],
+  ["Black-headed heron", "photos/black-headed-heron.jpg", "Muhammad Mahdi Karim", "GFDL 1.2", "https://commons.wikimedia.org/wiki/File:Black-headed_Heron_(Ardea_melanocephala).jpg", "af kr"],
+  ["Crested guineafowl", "photos/crested-guineafowl.jpg", "eboy", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Kenya_Crested_Guineafowl.jpg", "af kr"],
+  ["Laughing dove", "photos/laughing-dove.jpg", "Zeynel Cebeci", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Spilopelia_senegalensis_-_Laughing_Dove,_Adana_2016-12-10_01-2.jpg", "af kr"],
+  ["Red-billed hornbill", "photos/red-billed-hornbill.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Red-billed_hornbill_(Tockus_erythrorhynchus)_male.jpg", "af kr"],
+  ["Trumpeter hornbill", "photos/trumpeter-hornbill.jpg", "Clint Ralph", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Bycanistes_bucinator,_Sabi_Sands,_Mpumalanga,_South_Africa_00.jpg", "af kr"],
+  ["Purple-crested turaco", "photos/purple-crested-turaco.jpg", "Lip Kee Yap", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Purple-crested_Turaco_(Tauraco_porphyreolophus).jpg", "af kr"],
+  ["Sociable weaver", "photos/sociable-weaver.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Sociable_weaver_(Philetairus_socius).jpg", "af"],
+  ["Buffalo weaver", "photos/buffalo-weaver.jpg", "Greg Tee", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Red-billed_Buffalo_Weaver.jpg", "af kr"],
+  ["Leopard tortoise", "photos/leopard-tortoise.jpg", "Berthold Werner", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Geochelone_pardalis_bw_01.jpg", "af kr"],
+  ["Rock python", "photos/rock-python.jpg", "Graham J. Alexander, University of the Witwatersrand", "Public domain", "https://commons.wikimedia.org/wiki/File:Python_natalensis_G._J._Alexander.JPG", "af kr"],
+  ["Black mamba", "photos/black-mamba.jpg", "Bill Love/Blue Chameleon Ventures", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Dendroaspis_polylepis_by_Bill_Love.jpg", "af kr"],
+  ["Boomslang", "photos/boomslang.jpg", "William Warby from London, England", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Dispholidus_typus.jpg", "af kr"],
+  ["Cape cobra", "photos/cape-cobra.jpg", "Ryan van Huyssteen", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Naja_nivea_325326142.jpg", "af"],
+  ["Gaboon viper", "photos/gaboon-viper.jpg", "Ltshears", "Public domain", "https://commons.wikimedia.org/wiki/File:GaboonViper.jpg", "af"],
+  ["Rock monitor", "photos/rock-monitor.jpg", "Calibas", "Public domain", "https://commons.wikimedia.org/wiki/File:Whitethroatedmonitor.jpg", "af kr"],
+  ["Jackson's chameleon", "photos/jackson-s-chameleon.jpg", "Marius Burger", "CC0", "https://commons.wikimedia.org/wiki/File:Trioceros_jacksonii_114285602.jpg", "af"],
+  ["Bullfrog", "photos/bullfrog.jpg", "Steven G. Johnson", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Pyxicephalus_adspersus,_Boston_Aquarium.jpg", "af kr"],
+  ["Dung beetle", "photos/dung-beetle.jpg", "Tony Rebelo", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Scarabaeus_spretus.jpg", "af kr"],
+  ["Mopane worm", "photos/mopane-worm.jpg", "Arne Larsen", "Copyrighted free use", "https://commons.wikimedia.org/wiki/File:Mopane_Worm_by_Arne_Larsen.jpg", "af kr"],
+  ["African monarch", "photos/african-monarch.jpg", "Jeevan Jose, Kerala, India", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Danaus_chrysippus_Female_by_kadavoor.jpg", "af kr"],
+  ["Citrus swallowtail", "photos/citrus-swallowtail.jpg", "Muhammad Mahdi Karim", "GFDL 1.2", "https://commons.wikimedia.org/wiki/File:Citrus_Swallowtail_Papilio_demodocus.jpg", "af kr"],
+  ["Golden orb spider", "photos/golden-orb-spider.jpg", "MLinda99", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Laba-laba_Sutra_Emas_Pulau_Jawa.jpg", "af kr"],
+  ["Giant millipede", "photos/giant-millipede.jpg", "Bjørn Christian Tørrissen", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Archispirostreptus-Gigas-Amphitheatre.jpg", "af"],
+  ["Baboon spider", "photos/baboon-spider.jpg", "Domenico Von Dino", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Harpactira_marksi.JPG", "af kr"],
+  ["Emperor scorpion", "photos/emperor-scorpion.jpg", "Mike Baird", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Emperor_scorpion_or_Imperial_scorpion_(Pandinus_imperator).jpg", "af"],
+  ["White rhino", "photos/white-rhino.jpg", "Giles Laurent", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:075_White_rhinoceros_mother_and_her_newborn_baby_in_the_Kalahari_Desert_of_Namibia_Photo_by_Giles_Laurent.jpg", "af kr"],
+  ["Lichtenstein's hartebeest", "photos/lichtenstein-s-hartebeest.jpg", "Paul Maritz", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Lichtenstein's_Hartebeest.jpg", "af kr"],
+  ["Sharpe's grysbok", "photos/sharpe-s-grysbok.jpg", "Masteraah", "CC BY-SA 2.0 de", "https://commons.wikimedia.org/wiki/File:Sharpe's_Grysbok.jpg", "af kr"],
+  ["Red duiker", "photos/red-duiker.jpg", "Der Irbis", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Rotducker.jpg", "af kr"],
+  ["Mountain reedbuck", "photos/mountain-reedbuck.jpg", "BS Thurner Hof", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Bergriedbock_2007-08-16_201.jpg", "af kr"],
+  ["Chacma baboon", "photos/chacma-baboon.jpg", "D. Gordon E. Robertson", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Chacma_Baboon,_male.jpg", "af kr"],
+  ["Thick-tailed bushbaby", "photos/thick-tailed-bushbaby.jpg", "Hans Hillewaert", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Otolemur_crassicaudatus.jpg", "af kr"],
+  ["Spotted-necked otter", "photos/spotted-necked-otter.jpg", "derekkeats", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Spotted-necked_otter_1.jpg", "af kr"],
+  ["Slender mongoose", "photos/slender-mongoose.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Slender_Mongoose_(Galerella_sanguinea)_(6026100674).jpg", "af kr"],
+  ["White-tailed mongoose", "photos/white-tailed-mongoose.jpg", "MCSchaeffer", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:White-tailed_mongoose_(Ichneumia_albicauda),_crop.jpg", "af kr"],
+  ["Large-spotted genet", "photos/large-spotted-genet.jpg", "Justin Ponder", "CC BY 4.0", "https://commons.wikimedia.org/wiki/File:Genetta_tigrina_239838199.jpg", "af kr"],
+  ["Side-striped jackal", "photos/side-striped-jackal.jpg", "Thomas A. Hermann, NBII", "Public domain", "https://commons.wikimedia.org/wiki/File:Side-striped_Jackal.jpg", "af kr"],
+  ["African wildcat", "photos/african-wildcat.jpg", "Leonemanuel", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Felis_silvestris_cafra.jpg", "af kr"],
+  ["Tree squirrel", "photos/tree-squirrel.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Ardilla_africana_de_matorral_(Paraxerus_cepapi),_parque_nacional_Kruger,_Sudáfrica,_2018-07-25,_DD_45.jpg", "af kr"],
+  ["Scrub hare", "photos/scrub-hare.jpg", "Craig Thom", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Lepus_saxatilis,_Grootvadersbosch.jpg", "af kr"],
+  ["Epauletted fruit bat", "photos/epauletted-fruit-bat.jpg", "Susan Ellis", "CC BY 3.0 us", "https://commons.wikimedia.org/wiki/File:Epomophorus_wahlbergi1.jpg", "af kr"],
+  ["Grey hornbill", "photos/grey-hornbill.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:African_Grey_Hornbill_(Lophoceros_nasutus_epirhinus)_female.jpg", "af kr"],
+  ["Crowned hornbill", "photos/crowned-hornbill.jpg", "JerryFriedman", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Tockus_alboterminatus.jpg", "af kr"],
+  ["Brown snake eagle", "photos/brown-snake-eagle.jpg", "Bjørn Christian Tørrissen", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Circaetus-cinereus-Kenya.JPG", "af kr"],
+  ["Wahlberg's eagle", "photos/wahlberg-s-eagle.jpg", "Stephen Temple from Cape Town, South Africa", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Hieraaetus_wahlbergi_(45974520611).jpg", "af kr"],
+  ["African hawk-eagle", "photos/african-hawk-eagle.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:African_hawk-eagle_(Aquila_spilogaster).jpg", "af kr"],
+  ["Long-crested eagle", "photos/long-crested-eagle.jpg", "D. Gordon E. Robertson", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Long-crested_Eagle.jpg", "af kr"],
+  ["Black-winged kite", "photos/black-winged-kite.jpg", "Tisha Mukherjee", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Black-winged_Kite_in_Tal_Chhapar_Sanctuary_November_2025_by_Tisha_Mukherjee_03.jpg", "af kr"],
+  ["Yellow-billed kite", "photos/yellow-billed-kite.jpg", "New Jersey Birds", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Milvus_aegyptius_-Limpopo,_South_Africa-8.jpg", "af kr"],
+  ["White-backed vulture", "photos/white-backed-vulture.jpg", "Yathin sk", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:2012-white-backed-vulture.jpg", "af kr"],
+  ["Hooded vulture", "photos/hooded-vulture.jpg", "GabrielBuissart", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Necrosyrtes_monachus.jpg", "af kr"],
+  ["White-headed vulture", "photos/white-headed-vulture.jpg", "hyper7pro", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Trigonoceps_occipitalis_-Kruger_National_Park,_South_Africa_-flying-8.jpg", "af kr"],
+  ["Spotted eagle-owl", "photos/spotted-eagle-owl.jpg", "David Erickson", "Public domain", "https://commons.wikimedia.org/wiki/File:Spottedeagleowl.jpg", "af kr"],
+  ["Barn owl", "photos/barn-owl.jpg", "André Eijkenaar", "CC BY 3.0 nl", "https://commons.wikimedia.org/wiki/File:Kerkuil_André.JPG", "af kr"],
+  ["Pel's fishing owl", "photos/pel-s-fishing-owl.jpg", "Derek Keats", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Pel's_fishing_owl,_Scotopelia_pel.jpg", "af kr"],
+  ["White-faced owl", "photos/white-faced-owl.jpg", "Joachim Huber", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Ptilopsis_granti-Chobe_River_front,_Botswana-8.jpg", "af kr"],
+  ["Pearl-spotted owlet", "photos/pearl-spotted-owlet.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Pearl-spotted_owlet_(Glaucidium_perlatum_diurnum).jpg", "af kr"],
+  ["Brown-hooded kingfisher", "photos/brown-hooded-kingfisher.jpg", "Derek Keats", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Male_Brown-hooded_Kingfisher,_Halcyon_albiventris.jpg", "af kr"],
+  ["Woodland kingfisher", "photos/woodland-kingfisher.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Woodland_Kingfisher_(Halcyon_senegalensis)_South_Africa.jpg", "af kr"],
+  ["Giant kingfisher", "photos/giant-kingfisher.jpg", "Rute Martins", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Giant_Kingfisher-002.jpg", "af kr"],
+  ["White-fronted bee-eater", "photos/white-fronted-bee-eater.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:White-fronted_bee-eater_(Merops_bullockoides)_Namibia.jpg", "af kr"],
+  ["European bee-eater", "photos/european-bee-eater.jpg", "El Golli Mohamed", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Guépier_d'Europe_ichkeul128.jpg", "af kr"],
+  ["European roller", "photos/european-roller.jpg", "Zeynel Cebeci", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Coracias_garrulus_-_European_roller_02.jpg", "af kr"],
+  ["Broad-billed roller", "photos/broad-billed-roller.jpg", "Derek Keats from Johannesburg, South Africa", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Broad-billed_roller,_Kruger_National_park_(38184851631).jpg", "af kr"],
+  ["Blue-eared starling", "photos/blue-eared-starling.jpg", "flowcomm", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Greater_blue-eared_glossy-starling_(Lamprotornis_chalybaeus),_Kruger_National_Park,_South_Africa_(14988496302).jpg", "af kr"],
+  ["Burchell's starling", "photos/burchell-s-starling.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Burchell's_Starling_(Lamprotornis_australis)_at_Kruger_National_Park.jpg", "af kr"],
+  ["Violet-backed starling", "photos/violet-backed-starling.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Violet-backed_starling_(Cinnyricinclus_leucogaster_verreauxi)_male.jpg", "af kr"],
+  ["Red-winged starling", "photos/red-winged-starling.jpg", "Alandmanson", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Red-winged_Starling_2014_02_23_6113.jpg", "af kr"],
+  ["Magpie shrike", "photos/magpie-shrike.jpg", "New Jersey Birds", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Urolestes_melanoleucus_-Limpopo,_South_Africa-8.jpg", "af kr"],
+  ["Fork-tailed drongo", "photos/fork-tailed-drongo.jpg", "Derek Keats from Johannesburg, South Africa", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Fork-tailed_Drongo,_Dicrurus_adsimilis,_at_Marakele_National_Park,_Limpopo,_South_Africa_(45863627405).jpg", "af kr"],
+  ["Black-collared barbet", "photos/black-collared-barbet.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Barbudo_acollarado_(Lybius_torquatus),_parque_nacional_Kruger,_Sudáfrica,_2018-07-25,_DD_27.jpg", "af kr"],
+  ["Crested barbet", "photos/crested-barbet.jpg", "Jenny Varley", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Trachyphonus_vaillantii_-near_Sand_River_Selous,_Selous_Game_Reserve,_Tanzania-8.jpg", "af kr"],
+  ["Golden-tailed woodpecker", "photos/golden-tailed-woodpecker.jpg", "Derek Keats", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Golden-tailed_Woodpecker_-_MALE,_Campethera_abingoni,_at_Borakalalo_National_Park,_Northwest_Province,_South_Africa,_crop.jpg", "af kr"],
+  ["Red-billed quelea", "photos/red-billed-quelea.jpg", "New Jersey Birds", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Quelea_quelea_-Limpopo,_South_Africa-8.jpg", "af kr"],
+  ["Village weaver", "photos/village-weaver.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Village_weaver_(Ploceus_cucullatus_cucullatus)_female.jpg", "af kr"],
+  ["Red-billed firefinch", "photos/red-billed-firefinch.jpg", "Tom Tarrant", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Red_billed_firefinch_mbweya.jpg", "af kr"],
+  ["Blue waxbill", "photos/blue-waxbill.jpg", "Hans Hillewaert", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Uraeginthus_angolensis_(portrait).jpg", "af kr"],
+  ["Yellow-throated longclaw", "photos/yellow-throated-longclaw.jpg", "Ikiwaner", "GFDL 1.2", "https://commons.wikimedia.org/wiki/File:Serengeti_Gelbkehlpieper1.jpg", "af kr"],
+  ["Water thick-knee", "photos/water-thick-knee.jpg", "Greg Miles from Australia", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Water_Thick-knee,_flipped_&_cropped.jpg", "af kr"],
+  ["Spotted thick-knee", "photos/spotted-thick-knee.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Spotted_Thick-knee_(Burhinus_capensis)_(32680086412).jpg", "af kr"],
+  ["Black-winged stilt", "photos/black-winged-stilt.jpg", "JJ Harrison (https://www.jjharrison.com.au/)", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Himantopus_himantopus_-_Pak_Thale.jpg", "af kr"],
+  ["Wattled lapwing", "photos/wattled-lapwing.jpg", "Whit Welles", "CC BY 3.0", "https://commons.wikimedia.org/wiki/File:Wattled_Plover_Mara_edit3.jpg", "af kr"],
+  ["Grey heron", "photos/grey-heron.jpg", "JJ Harrison (https://www.jjharrison.com.au/)", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Ardea_cinerea_-_Pak_Thale.jpg", "af kr"],
+  ["Purple heron", "photos/purple-heron.jpg", "Yathin S Krishnappa", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:2010-kabini-purple-heron.jpg", "af kr"],
+  ["Squacco heron", "photos/squacco-heron.jpg", "Pierre Dalous", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Crabier_chevelu.jpg", "af kr"],
+  ["Little egret", "photos/little-egret.jpg", "El Golli Mohamed", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Aigrette_garzette_au_lac_sud_de_Tunis_(site_RAMSAR).jpg", "af kr"],
+  ["African openbill", "photos/african-openbill.jpg", "ColdCalifornian", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:African_Openbill.jpg", "af kr"],
+  ["Black stork", "photos/black-stork.jpg", "Chris Eason", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Ciconia_nigra_-Kruger_National_Park-8.jpg", "af kr"],
+  ["White stork", "photos/white-stork.jpg", "Carlos Delgado", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Ciconia_ciconia_-_01.jpg", "af kr"],
+  ["Spur-winged goose", "photos/spur-winged-goose.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Spur-winged_Geese_(Plectropterus_gambensis_niger)_male.jpg", "af kr"],
+  ["Whistling duck", "photos/whistling-duck.jpg", "Josue Hermoza", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Dendrocygna_viduata_2.jpg", "af kr"],
+  ["Knob-billed duck", "photos/knob-billed-duck.jpg", "Koshy Koshy", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Knob-billed_Duck_at_Sonkhaliya,_Rajasthan,_India,_July_2013.jpg", "af kr"],
+  ["Crested francolin", "photos/crested-francolin.jpg", "Dick Daniels (http://theworldbirds.org/)", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Crested_Francolin_RWD.jpg", "af kr"],
+  ["Natal spurfowl", "photos/natal-spurfowl.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Natal_Spurfowl_(Pternistis_natalensis)_(32747883440).jpg", "af kr"],
+  ["Sandgrouse", "photos/sandgrouse.jpg", "Alan Manson", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Pterocles_bicinctus_-Northern_Cape,_South_Africa_-male-8.jpg", "af kr"],
+  ["Green pigeon", "photos/green-pigeon.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:African_Green_Pigeon_(Treron_calvus)_(11423539903)_(cropped).jpg", "af kr"],
+  ["Brown-headed parrot", "photos/brown-headed-parrot.jpg", "HenryFlower", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Poicephalus_cryptoxanthus_-Kruger_Park,_South_Africa-8.jpg", "af kr"],
+  ["Meyer's parrot", "photos/meyer-s-parrot.jpg", "Oce Eeco", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Poicephalus_meyeri_-Zimbabwe_-two-8-3c.jpg", "af kr"],
+  ["Burchell's coucal", "photos/burchell-s-coucal.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Burchell's_Coucal_(Centropus_burchellii)_(52716453867).jpg", "af kr"],
+  ["Red-crested korhaan", "photos/red-crested-korhaan.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Red-crested_Korhaan_(Lophotis_ruficrista)_male_(13799477455).jpg", "af kr"],
+  ["Paradise whydah", "photos/paradise-whydah.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Long-tailed_paradise-whydah_(Vidua_paradisaea)_male.jpg", "af kr"],
+  ["Scarlet-chested sunbird", "photos/scarlet-chested-sunbird.jpg", "Tom Tarrant", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Scarlet_chested_sunbird.jpg", "af kr"],
+  ["Common fiscal", "photos/common-fiscal.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Southern_Fiscal_(Lanius_collaris)_female_(32227989140),_crop.jpg", "af kr"],
+  ["Helmetshrike", "photos/helmetshrike.jpg", "Farid AMADOU BAHLEMAN", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Bagadais_casqué_autour_du_complexe_Pendjari._02.jpg", "af kr"],
+  ["Mozambique spitting cobra", "photos/mozambique-spitting-cobra.jpg", "Chris Eason", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Mfezi_2352859459.jpg", "af kr"],
+  ["Spotted bush snake", "photos/spotted-bush-snake.jpg", "Dylan Leonard", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Philothamnus_semivariegatus_338257777.jpg", "af kr"],
+  ["Hinged tortoise", "photos/hinged-tortoise.jpg", "Tommy Andriollo", "CC BY 4.0", "https://commons.wikimedia.org/wiki/File:Kinixys_belliana_253606814.jpg", "af kr"],
+  ["Tree agama", "photos/tree-agama.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Southern_Tree_Agama_(Acanthocercus_atricollis)_(6002525679).jpg", "af kr"],
+  ["Flat lizard", "photos/flat-lizard.jpg", "Chris Eason", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Common_Flat_Lizard_2355693508.jpg", "af kr"],
+  ["Striped skink", "photos/striped-skink.jpg", "Muhammad Mahdi Karim", "GFDL 1.2", "https://commons.wikimedia.org/wiki/File:Trachylepis_striata_edit.jpg", "af kr"],
+  ["Giant plated lizard", "photos/giant-plated-lizard.jpg", "Rolf Dietrich Brecher from Germany", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Reptiles_(15395098249).jpg", "af kr"],
+  ["Foam nest frog", "photos/foam-nest-frog.jpg", "Simon J. Tonge", "CC BY 3.0", "https://commons.wikimedia.org/wiki/File:Chiromantis_xerampelina.jpeg", "af kr"],
+  ["Guttural toad", "photos/guttural-toad.jpg", "Marius Burger", "CC0", "https://commons.wikimedia.org/wiki/File:Sclerophrys_gutturalis_349258132.jpg", "af kr"],
+  ["Painted reed frog", "photos/painted-reed-frog.jpg", "Ryanvanhuyssteen", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Hyperolius_marmoratus.jpg", "af kr"],
+  ["Antlion", "photos/antlion.jpg", "dhobern", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Myrmeleon_acer.jpg", "af kr"],
+  ["Toktokkie beetle", "photos/toktokkie-beetle.jpg", "JonRichfield", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Toktokkie_beetle_Tenebrionidae_Psammodes_ventral_aspect_IMG_7414.jpg", "af kr"],
+  ["Blister beetle", "photos/blister-beetle.jpg", "Unknown author", "Attribution", "https://commons.wikimedia.org/wiki/File:Mylabris_quadripunctata01.jpg", "af kr"],
+  ["Rhinoceros beetle", "photos/rhinoceros-beetle.jpg", "JohnSka", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Oryctes_boas_f.jpg", "af kr"],
+  ["Foam grasshopper", "photos/foam-grasshopper.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Koppie_foam_grasshopper_(Dictyophorus_spumans_spumans)_nymph.jpg", "af kr"],
+  ["Elegant grasshopper", "photos/elegant-grasshopper.jpg", "Florian H.", "CC BY 3.0", "https://commons.wikimedia.org/wiki/File:Zonocerus_elegans.jpg", "af kr"],
+  ["Rain spider", "photos/rain-spider.jpg", "JonRichfield", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Sparassidae_Palystes_castaneus_mature_female_9923s.jpg", "af kr"],
+  ["Thick-tailed scorpion", "photos/thick-tailed-scorpion.jpg", "Alexander Tietz", "CC BY-SA 2.0 de", "https://commons.wikimedia.org/wiki/File:Parabuthus_transvaalicus_(male).jpg", "af kr"],
+  ["Carpenter bee", "photos/carpenter-bee.jpg", "Toni Wöhrl", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:20140705T140709_Lat_1_19_58.18951242_N_Long_103_26_29.10353982_E.jpg", "af kr"],
+  ["Tigerfish", "photos/tigerfish.jpg", "Totti", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Hydrocynus_vittatus_Gifu.jpg", "af kr"],
+  ["Mozambique tilapia", "photos/mozambique-tilapia.jpg", "Greg Hume", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Oreochromis_mossambicus.JPG", "af kr"],
+  ["Orca", "photos/orca.jpg", "Robert Pitman", "Public domain", "https://commons.wikimedia.org/wiki/File:Type_C_Orcas_2.jpg", "sea"],
+  ["Sperm whale", "photos/sperm-whale.jpg", "Gabriel Barathieu", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Mother_and_baby_sperm_whale.jpg", "sea"],
+  ["Narwhal", "photos/narwhal.jpg", "Gazprom Neft press service", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Нарвал_в_российской_Арктике.jpg", "sea"],
+  ["Walrus", "photos/walrus.jpg", "Joel Garlich-Miller, USFWS", "Public domain", "https://commons.wikimedia.org/wiki/File:Pacific_Walrus_-_Bull_(8247646168).jpg", "sea"],
+  ["Manatee", "photos/manatee.jpg", "NASA", "Public domain", "https://commons.wikimedia.org/wiki/File:Manatee_photo.jpg", "sea"],
+  ["Dugong", "photos/dugong.jpg", "Julien Willem", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Dugong_Marsa_Alam.jpg", "sea"],
+  ["Leopard seal", "photos/leopard-seal.jpg", "Unknown author", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Hydrurga_leptonyx_edit1.jpg", "sea"],
+  ["Hammerhead shark", "photos/hammerhead-shark.jpg", "Barry Peters", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Scalloped_hammerhead_cocos.jpg", "sea"],
+  ["Whale shark", "photos/whale-shark.jpg", "Arturo de Frias Marques", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Whale_Shark_AdF.jpg", "sea"],
+  ["Nurse shark", "photos/nurse-shark.jpg", "Unknown author", "Public domain", "https://commons.wikimedia.org/wiki/File:Nurse_shark.jpg", "sea"],
+  ["Stingray", "photos/stingray.jpg", "Jens Petersen", "CC BY 2.5", "https://commons.wikimedia.org/wiki/File:Taeniura_lymma2a.jpg", "sea"],
+  ["Eagle ray", "photos/eagle-ray.jpg", "john norton", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Spotted_Eagle_Ray_(Aetobatus_narinari)2.jpg", "sea"],
+  ["Sawfish", "photos/sawfish.jpg", "Diliff", "CC BY 2.5", "https://commons.wikimedia.org/wiki/File:Pristis_pristis_-_Georgia_Aquarium_Jan_2006.jpg", "sea"],
+  ["Ocean sunfish", "photos/ocean-sunfish.jpg", "Per-Ola Norman", "Public domain", "https://commons.wikimedia.org/wiki/File:Sunfish2.jpg", "sea"],
+  ["Bluefin tuna", "photos/bluefin-tuna.jpg", "Unknown author", "Public domain", "https://commons.wikimedia.org/wiki/File:Thunnus_thynnus_2.jpg", "sea"],
+  ["Atlantic salmon", "photos/atlantic-salmon.jpg", "Hartley, William W.", "Public domain", "https://commons.wikimedia.org/wiki/File:Atlantischer_Lachs.jpg", "sea"],
+  ["Halibut", "photos/halibut.jpg", "Krüger", "Public domain", "https://commons.wikimedia.org/wiki/File:Hippoglossus_hippoglossus1.jpg", "sea"],
+  ["Mackerel", "photos/mackerel.jpg", "Hans Hillewaert", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Scomber_scombrus.jpg", "sea"],
+  ["Herring", "photos/herring.jpg", "Uwe Kils", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Herring2.jpg", "sea"],
+  ["Lionfish", "photos/lionfish.jpg", "Christian Mehlführer, User:Chmehl", "CC BY 2.5", "https://commons.wikimedia.org/wiki/File:MC_Rotfeuerfisch.jpg", "sea"],
+  ["Humphead wrasse", "photos/humphead-wrasse.jpg", "Unknown author", "GFDL 1.2", "https://commons.wikimedia.org/wiki/File:Humphead_wrasse_melb_aquarium.jpg", "sea"],
+  ["Parrotfish", "photos/parrotfish.jpg", "Albert Kok", "Public domain", "https://commons.wikimedia.org/wiki/File:Papegaaivis.JPG", "sea"],
+  ["Pufferfish", "photos/pufferfish.jpg", "Richard Ling", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Arothron_stellatus_1.jpg", "sea"],
+  ["Boxfish", "photos/boxfish.jpg", "Norbert Potensky", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Kofferfisch_(Ostracion_cubicus)_02.jpg", "sea"],
+  ["Triggerfish", "photos/triggerfish.jpg", "Derek Ramsey", "CC BY-SA 2.5", "https://commons.wikimedia.org/wiki/File:Clown_Triggerfish_Balistoides_conspicillum_Side_1888px.jpg", "sea"],
+  ["Butterflyfish", "photos/butterflyfish.jpg", "Laszlo Ilyes", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Chaetodon_capistratus2.jpg", "sea"],
+  ["Emperor angelfish", "photos/emperor-angelfish.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Pez_ángel_emperador_(Pomacanthus_imperator),_islas_Ad_Dimaniyat,_Omán,_2024-08-14,_DD_47.jpg", "sea"],
+  ["Blue tang", "photos/blue-tang.jpg", "Tewy", "CC BY 2.5", "https://commons.wikimedia.org/wiki/File:Blue_tang_(Paracanthurus_hepatus)_02.jpg", "sea"],
+  ["Moorish idol", "photos/moorish-idol.jpg", "Philippe Bourjon", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Idole_des_Maures_(Zanclus_cornutus).jpg", "sea"],
+  ["Stonefish", "photos/stonefish.jpg", "Karelj", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Synanceia_verrucosa_Prague_2011_2.jpg", "sea"],
+  ["Leafy sea dragon", "photos/leafy-sea-dragon.jpg", "Derek Ramsey", "CC BY-SA 2.5", "https://commons.wikimedia.org/wiki/File:Leafy_Seadragon_Phycodurus_eques_2500px_PLW_edit.jpg", "sea"],
+  ["Garden eel", "photos/garden-eel.jpg", "Esquilo", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Rörålar.jpg", "sea"],
+  ["Sea urchin", "photos/sea-urchin.jpg", "Taollan82", "CC BY 3.0", "https://commons.wikimedia.org/wiki/File:Strongylocentrotus_purpuratus_1.jpg", "sea"],
+  ["Nudibranch", "photos/nudibranch.jpg", "Bernard Picton", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Chromodoris_lineolata-3.jpg", "sea"],
+  ["Giant clam", "photos/giant-clam.jpg", "Janderk", "Public domain", "https://commons.wikimedia.org/wiki/File:Giant_clam_or_Tridacna_gigas.jpg", "sea"],
+  ["Nautilus", "photos/nautilus.jpg", "J. Baecker", "Public domain", "https://commons.wikimedia.org/wiki/File:Nautilus-JB-01.jpg", "sea"],
+  ["Squid", "photos/squid.jpg", "Philippe Bourjon", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Sepioteuthis_lessoniana_Réunion.JPG", "sea"],
+  ["Blue-ringed octopus", "photos/blue-ringed-octopus.jpg", "Jens Petersen", "CC BY 2.5", "https://commons.wikimedia.org/wiki/File:Hapalochlaena_lunulata2.JPG", "sea"],
+  ["Hermit crab", "photos/hermit-crab.jpg", "Was a bee", "Public domain", "https://commons.wikimedia.org/wiki/File:Dardanus_megistos1.jpg", "sea"],
+  ["Spiny lobster", "photos/spiny-lobster.jpg", "Douglas Whitaker", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Panulirus_argus.jpg", "sea"],
+  ["Krill", "photos/krill.jpg", "Uwe Kils", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Antarctic_krill_(Euphausia_superba).jpg", "sea"],
+  ["Brain coral", "photos/brain-coral.jpg", "Unknown author", "Public domain", "https://commons.wikimedia.org/wiki/File:Brain_coral.jpg", "sea"],
+  ["Sea anemone", "photos/sea-anemone.jpg", "Hans Hillewaert", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Actinia_equina_(Boulogne-sur-Mer).jpg", "sea"],
+  ["Portuguese man o' war", "photos/portuguese-man-o-war.jpg", "NOAA", "Public domain", "https://commons.wikimedia.org/wiki/File:Portuguese_Man-O-War_(Physalia_physalis).jpg", "sea"],
+  ["Horseshoe crab", "photos/horseshoe-crab.jpg", "Hans Hillewaert", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Limulus_polyphemus_(aq.).jpg", "sea"],
+  ["Scallop", "photos/scallop.jpg", "Manfred Heyde", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Pecten_maximus_Pilgermuschel.jpg", "sea"],
+  ["Christmas tree worm", "photos/christmas-tree-worm.jpg", "Nick Hobgood", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Spirobranchus_giganteus_(Red_and_white_christmas_tree_worm).jpg", "sea"],
+  ["Marine iguana", "photos/marine-iguana.jpg", "Unknown author", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Iguanamarina.jpg", "sea"],
+  ["Sea snake", "photos/sea-snake.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Serpiente_marina_de_hocico_ancho_(Laticauda_colubrina),_Anilao,_Filipinas,_2023-08-23,_DD_04.jpg", "sea"],
+  ["Hawksbill turtle", "photos/hawksbill-turtle.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Tortuga_carey_(Eretmochelys_imbricata),_parque_nacional_Ras_Muhammad,_Egipto,_2022-03-28,_DD_56.jpg", "sea"],
+  ["Cape grysbok", "photos/cape-grysbok.jpg", "Jimfbleak", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Southafrica-capegrysbok.jpg", "af"],
+  ["Blesbok", "photos/blesbok.jpg", "Axel Tschentscher", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Blesbok_Side_2019-07-28.jpg", "af"],
+  ["Bontebok", "photos/bontebok.jpg", "Thomas Schoch", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Bontebok_Namibia.jpg", "af"],
+  ["Cape mountain zebra", "photos/cape-mountain-zebra.jpg", "Steve Evans from Citizen of the World", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Zebra_(8137989014).jpg", "af"],
+  ["Grey rhebok", "photos/grey-rhebok.jpg", "Cburnett", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Vaal_Rhebok.jpg", "af"],
+  ["Oribi", "photos/oribi.jpg", "Judy Gallagher", "CC BY 4.0", "https://commons.wikimedia.org/wiki/File:Ourebia_ourebi_28084489.jpg", "af"],
+  ["Suni", "photos/suni.jpg", "Olivier Lejade from France", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Suni_3.jpg", "af kr"],
+  ["Southern right whale", "photos/southern-right-whale.jpg", "Michaël CATANZARITI", "Public domain", "https://commons.wikimedia.org/wiki/File:Southern_right_whale6.jpg", "af"],
+  ["Black-footed cat", "photos/black-footed-cat.jpg", "Pierre de Chabannes", "CC BY-SA 2.5", "https://commons.wikimedia.org/wiki/File:Felis_nigripes_5.JPG", "af"],
+  ["Blue crane", "photos/blue-crane.jpg", "Charles J. Sharp", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Blue_Crane_South_Africa.jpg", "af"],
+  ["Wattled crane", "photos/wattled-crane.jpg", "Per Arne Slotte from Trondheim, Norway", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Grus_carunculata,_Linyanti,_Caprivi,_Namibia_1.jpg", "af"],
+  ["Southern bald ibis", "photos/southern-bald-ibis.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Southern_Bald_Ibis_(Geronticus_calvus)_(29865447691).jpg", "af"],
+  ["Bearded vulture", "photos/bearded-vulture.jpg", "Francesco Veronesi from Italy", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Bearded_Vulture_-_Catalan_Pyrenees_-_Spain_(25098398432).jpg", "af"],
+  ["Verreaux's eagle", "photos/verreaux-s-eagle.jpg", "Steve Garvie from Dunfermline, Fife, Scotland", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Flickr_-_Rainbirder_-_Verreaux's_Eagle_pair.jpg", "af"],
+  ["Jackal buzzard", "photos/jackal-buzzard.jpg", "Alan Manson", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Buteo_rufofuscus_-Itala_Game_Reserve,_KwaZulu-Natal,_South_Africa_-flying-6.jpg", "af"],
+  ["Pale chanting goshawk", "photos/pale-chanting-goshawk.jpg", "Alastair Rae", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Pale_Chanting_Goshawk_.jpg", "af"],
+  ["African harrier-hawk", "photos/african-harrier-hawk.jpg", "Jenny Varley", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Polyboroides_typus_-near_Sand_River_Selous,_Selous_Game_Reserve,_Tanzania-8,_crop.jpg", "af kr"],
+  ["Amur falcon", "photos/amur-falcon.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Amur_Falcon_(Falco_amurensis)_male_(16794543415).jpg", "af kr"],
+  ["Ludwig's bustard", "photos/ludwig-s-bustard.jpg", "Hans Hillewaert", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Neotis_ludwigii.jpg", "af"],
+  ["Northern black korhaan", "photos/northern-black-korhaan.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Northern_black_korhaan_(Afrotis_afraoides)_male.jpg", "af"],
+  ["Cape sugarbird", "photos/cape-sugarbird.jpg", "Alan Manson", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Cape_Sugarbird_(Promerops_cafer).jpg", "af"],
+  ["Orange-breasted sunbird", "photos/orange-breasted-sunbird.jpg", "Ragnhild&Neil Crawford from Sweden", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Orange-breasted_sunbird_på_Leucadendron_strobilinum_-_Flickr_-_Ragnhild_&_Neil_Crawford.jpg", "af"],
+  ["Cape weaver", "photos/cape-weaver.jpg", "Derek Keats from South Africa", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Ploceus_capensis_-Johannesburg,_South_Africa_-male-8.jpg", "af"],
+  ["Pied crow", "photos/pied-crow.jpg", "Frank Vassen from Brussels, Belgium", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Corvus_albus_-Etosha_National_Park,_Namibia-8.jpg", "af kr"],
+  ["Cape robin-chat", "photos/cape-robin-chat.jpg", "Alan Manson", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Cape_Robin-Chat_(Cossypha_caffra)2.jpg", "af"],
+  ["Southern masked weaver", "photos/southern-masked-weaver.jpg", "Prosthetic Head", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Ploceus_velatus_beak_open.jpg", "af kr"],
+  ["Bokmakierie", "photos/bokmakierie.jpg", "Derek Keats from South Africa", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Telophorus_zeylonus_Johannesburg.jpeg", "af"],
+  ["Knysna turaco", "photos/knysna-turaco.jpg", "Anton Frolich", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Knysna_Turacos.JPG", "af"],
+  ["Narina trogon", "photos/narina-trogon.jpg", "Alandmanson", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Narina_Trogon_2015_10_18_07_15_12_9964.jpg", "af kr"],
+  ["Cape gannet", "photos/cape-gannet.jpg", "Avitopia www.avitopia.net", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Cape_Gannet_-_Morus_capensis.JPG", "af"],
+  ["African oystercatcher", "photos/african-oystercatcher.jpg", "DickDaniels (https://theworldbirds.org/)", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:African_Black_Oystercatcher_RWD1.jpg", "af"],
+  ["Cape eagle-owl", "photos/cape-eagle-owl.jpg", "DickDaniels (http://theworldbirds.org/)", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Cape_Eagle-Owl_RWD.jpg", "af"],
+  ["Marsh owl", "photos/marsh-owl.jpg", "Josefito123", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Asio_capensis_(Buho_moro_-_Marsh_Owl),_Merga_Zerga,_Marruecos.jpg", "af"],
+  ["Yellow-billed duck", "photos/yellow-billed-duck.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Pato_de_pico_amarillo_(Anas_undulata),_parque_nacional_del_Lago_Mburo,_Uganda,_2024-02-01,_DD_50.jpg", "af kr"],
+  ["Red-knobbed coot", "photos/red-knobbed-coot.jpg", "shi zhao", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Fulica_cristata_-Cape_Town,_South_Africa_-adult-8.jpg", "af kr"],
+  ["Black-headed oriole", "photos/black-headed-oriole.jpg", "Diego Delso", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Oropéndola_enmascarada_(Oriolus_larvatus),_parque_nacional_Kruger,_Sudáfrica,_2018-07-25,_DD_44.jpg", "af kr"],
+  ["Red-faced mousebird", "photos/red-faced-mousebird.jpg", "Patty McGann", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Red-faced_Mousebird_(Urocolius_indicus)_hanging_in_tree,_front_view.jpg", "af kr"],
+  ["Sparrow-weaver", "photos/sparrow-weaver.jpg", "Valentina", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Plocepasser_mahali_-Baringo_Lake,_Kenya_-male-8.jpg", "af kr"],
+  ["Swallow-tailed bee-eater", "photos/swallow-tailed-bee-eater.jpg", "Charles J. Sharp", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Swallow-tailed_bee-eater_(Merops_hirundineus_chrysolaimus).jpg", "af"],
+  ["Cape rockjumper", "photos/cape-rockjumper.jpg", "Matthew Wridgway from South Africa", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Cape_Rock-Jumper_(Chaetops_frenatus).jpg", "af"],
+  ["Rinkhals", "photos/rinkhals.jpg", "Lee R. Berger", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Rinkhals2.jpg", "af"],
+  ["Angulate tortoise", "photos/angulate-tortoise.jpg", "Bernard DUPONT from FRANCE", "CC BY-SA 2.0", "https://commons.wikimedia.org/wiki/File:Angulated_Tortoise_(Chersina_angulata)_(44576093050).jpg", "af"],
+  ["Armadillo girdled lizard", "photos/armadillo-girdled-lizard.jpg", "frank wouters", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Armadillo_girdle-tailed_lizard.jpg", "af"],
+  ["Sungazer", "photos/sungazer.jpg", "Wilfried Berns / www.Tiermotive.de", "CC BY 2.5", "https://commons.wikimedia.org/wiki/File:Cordylus_giganteus.jpg", "af"],
+  ["Namaqua chameleon", "photos/namaqua-chameleon.jpg", "Hans Stieglitz", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Namaqua_Chamäleon-01.jpg", "af"],
+  ["Cape dwarf chameleon", "photos/cape-dwarf-chameleon.jpg", "Charles J. Sharp", "CC BY 3.0", "https://commons.wikimedia.org/wiki/File:Cape_dwarf_chameleon_(Bradypodion_pumilum)_male.jpg", "af"],
+  ["Western leopard toad", "photos/western-leopard-toad.jpg", "Marius Burger", "CC0", "https://commons.wikimedia.org/wiki/File:Sclerophrys_pantherina_315498480.jpg", "af"],
+  ["Garden acraea", "photos/garden-acraea.jpg", "Zunaid", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Acraea_horta.jpg", "af kr"],
+  ["Armoured cricket", "photos/armoured-cricket.jpg", "SoniaSoma", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Namibgreencricket.JPG", "af kr"],
+  ["Dotted border butterfly", "photos/dotted-border-butterfly.jpg", "Derek Keats from Johannesburg, South Africa", "CC BY 2.0", "https://commons.wikimedia.org/wiki/File:Common_dotted_border,_Mylothris_agathina,_female_(38152914392).jpg", "af kr"]
+].map(([name,src,artist,license,page,region])=>({name,src,artist,license,page,region,photo:true}));
+
+const COLORS=["var(--p1)","var(--p2)","var(--p3)","var(--p4)"];
+const KEYS=["a","l","z","m"];
+const DEFAULT_NAMES=["Player 1","Player 2","Player 3","Player 4"];
+const $=id=>document.getElementById(id);
+const ANSWER_TIME=12, LINGER=6, START_ZOOM=8;
+
+let cfg={n:3,rounds:12,speed:18,pool:"all",names:[...DEFAULT_NAMES]};
+let photos=[]; // {name,src}
+let G=null;
+
+/* ---------- setup UI ---------- */
+function seg(id,attr,onPick){
+  $(id).addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+    [...$(id).children].forEach(x=>x.setAttribute("aria-pressed",x===b));onPick(+b.dataset[attr]);});
+}
+seg("countSeg","n",n=>{cfg.n=n;renderPlayerInputs();});
+seg("roundSeg","r",r=>cfg.rounds=r);
+seg("speedSeg","s",s=>cfg.speed=s);
+seg("poolSeg","p",v=>cfg.pool=["all","af","sea","kr"][v]);
+const hasTag=(a,t)=>(a.region||"").split(" ").includes(t);
+{const nAf=ANIMALS.filter(a=>hasTag(a,"af")).length,nSea=ANIMALS.filter(a=>hasTag(a,"sea")).length;$("poolSea").textContent=`Sea creatures only (${nSea})`;$("poolKr").textContent=`Kruger Park only (${ANIMALS.filter(a=>hasTag(a,"kr")).length})`;
+ $("poolAll").textContent=`All ${ANIMALS.length}`;$("poolAf").textContent=`African safari only (${nAf})`;
+ $("trailCount").textContent=`${ANIMALS.length} animals on the trail, ${nAf} from African safaris and ${nSea} from the sea. Real photos from Wikimedia Commons`;}
+function renderPlayerInputs(){
+  $("playerInputs").innerHTML="";
+  for(let i=0;i<cfg.n;i++){
+    const r=document.createElement("div");r.className="prow";
+    r.innerHTML=`<span class="dot" style="background:${COLORS[i]}"></span><input id="pname${i}" maxlength="16" aria-label="Player ${i+1} name"><span>buzz <kbd>${KEYS[i].toUpperCase()}</kbd></span>`;
+    $("playerInputs").appendChild(r);
+    const inp=r.querySelector("input");inp.value=cfg.names[i];inp.addEventListener("input",()=>cfg.names[i]=inp.value);
+  }
+}
+renderPlayerInputs();
+$("preview").innerHTML=[...ANIMALS].sort(()=>Math.random()-.5).slice(0,12).map(a=>`<img alt="" src="${a.src}">`).join("");
+$("preview").querySelectorAll("img").forEach(i=>i.addEventListener("error",()=>showPhotoWarning()));
+
+$("photoInput").addEventListener("change",e=>{
+  const files=[...e.target.files];
+  files.forEach(f=>{
+    const name=f.name.replace(/\.[^.]+$/,"").replace(/[\d_\-]+/g," ").replace(/\s+/g," ").trim().replace(/\b\w/g,c=>c.toUpperCase())||"Mystery animal";
+    photos.push({name,src:URL.createObjectURL(f)});
+  });
+  updatePhotoNote();e.target.value="";
+});
+$("clearPhotos").addEventListener("click",()=>{photos=[];updatePhotoNote();});
+function updatePhotoNote(){
+  $("clearPhotos").hidden=!photos.length;
+  $("photoNote").innerHTML=photos.length
+    ?`<b>${photos.length} photo${photos.length>1?"s":""} loaded:</b> ${photos.map(p=>p.name).join(", ")}. They come first, then the built-in animals.`
+    :`Name each file after its animal, like <b>snow-leopard.jpg</b>. Your photos come first in the game and never leave this browser.`;
+}
+
+/* ---------- sound ---------- */
+let AC=null;
+function tone(freq,dur=.15,type="square",vol=.08,when=0){
+  try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+when;
+    o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    o.connect(g).connect(AC.destination);o.start(t);o.stop(t+dur);}catch(e){}
+}
+const sfx={buzz:()=>{tone(220,.25,"sawtooth",.07)},right:()=>{tone(660,.12,"triangle",.12);tone(880,.18,"triangle",.12,.1);tone(1320,.25,"triangle",.1,.2)},
+  wrong:()=>{tone(180,.3,"square",.06);tone(140,.35,"square",.06,.15)},reveal:()=>tone(440,.2,"triangle",.08)};
+
+/* ---------- helpers ---------- */
+const ALIASES={
+  "Rhinoceros":["rhino"],"Hippopotamus":["hippo"],"Camel":["dromedary"],"Gorilla":["silverback"],"Orangutan":["orang utan","orangutang"],
+  "Leopard":["jaguar"],"Panda":["giant panda","panda bear"],"Red panda":["lesser panda"],"Koala":["koala bear"],"Polar bear":["ice bear"],
+  "Bear":["brown bear","grizzly","grizzly bear","kodiak bear"],"Fox":["red fox"],"Wolf":["grey wolf","gray wolf","timber wolf"],"Hyena":["hyaena","spotted hyena"],
+  "Lemur":["ring tailed lemur"],"Deer":["stag","red deer"],"Moose":["elk"],"Bison":["buffalo"],"Horse":["pony","stallion","horses"],"Cow":["cattle","dairy cow"],
+  "Pig":["piglet","hog"],"Sheep":["lamb","ewe"],"Llama":["alpaca"],"Rabbit":["bunny","hare","cottontail"],"Cat":["kitten","kitty","tabby"],
+  "Dog":["husky","huskies","sled dog","puppy"],"Chicken":["rooster","hen","cockerel"],"Turkey":["wild turkey"],"Peacock":["peafowl","peahen"],
+  "Parrot":["macaw"],"Eagle":["bald eagle"],"Owl":["horned owl","great horned owl"],"Penguin":["emperor penguin"],"Duck":["mallard"],
+  "Whale":["humpback","humpback whale"],"Shark":["great white","great white shark","white shark"],"Dolphin":["bottlenose dolphin"],"Otter":["sea otter"],
+  "Crocodile":["croc","alligator","saltwater crocodile"],"Turtle":["sea turtle"],"Frog":["tree frog","red eyed tree frog"],"Butterfly":["monarch","monarch butterfly"],
+  "Snail":["slug"],"Octopus":["octopi"],"Armadillo":["nine banded armadillo"],"Meerkat":["suricate"],"Ostrich":["emu"],"Cheetah":[],
+  "Secretary bird":["secretarybird"],"Marabou stork":["marabou","stork"],"Crowned crane":["grey crowned crane","gray crowned crane","crane"],"Lilac-breasted roller":["roller"],
+  "Vulture":["cape vulture"],"Fish eagle":["african fish eagle","eagle"],"Starling":["cape starling","glossy starling"],"Guineafowl":["guinea fowl","helmeted guineafowl"],
+  "Weaver bird":["weaver","weaverbird"],"Saddle-billed stork":["saddlebill","stork"],"Bateleur eagle":["bateleur","eagle"],"Hornbill":["yellow billed hornbill","zazu"],
+  "Egyptian goose":["goose"],"Monitor lizard":["nile monitor","monitor"],"Mamba":["green mamba","snake"],"Agama lizard":["agama","rock agama","lizard"],
+  "Cape buffalo":["buffalo","african buffalo"],"Wildebeest":["gnu","blue wildebeest"],"Impala":["antelope"],"Thomson's gazelle":["gazelle","tommy","thomsons gazelle"],
+  "Warthog":["pumbaa","wart hog"],"Kudu":["greater kudu"],"Eland":["antelope"],"Oryx":["gemsbok"],"Springbok":["springbuck"],"Topi":["tsessebe"],
+  "Waterbuck":["antelope"],"Dik-dik":["dikdik","dik dik"],"Sable antelope":["sable"],"Roan antelope":["roan"],"Serval":["serval cat"],"Caracal":["desert lynx"],
+  "Jackal":["black backed jackal"],"Mongoose":["yellow mongoose"],"Baboon":["olive baboon"],"Vervet monkey":["vervet","monkey"],"Colobus monkey":["colobus","monkey"],
+  "Rock hyrax":["hyrax","dassie"],"Chimpanzee":["chimp","ape"],"Ground squirrel":["cape ground squirrel","squirrel"],"Turaco":["great blue turaco"],
+  "Goliath heron":["heron"],"Puff adder":["adder","snake","viper"],"Barbet":["usambiro barbet"],"Samango monkey":["samango","monkey"],"Kob":["ugandan kob","antelope"],
+  "Bee-eater":["little bee eater","bee eater"],
+  "African wild dog":["wild dog","painted dog","painted wolf","hunting dog"],"Aardvark":["antbear","ant bear"],"Pangolin":["scaly anteater","ground pangolin"],
+  "Honey badger":["ratel"],"Bat-eared fox":["bat eared fox","fox"],"Aardwolf":["aard wolf"],"Genet":["common genet","genet cat"],"African civet":["civet","civet cat"],
+  "Gerenuk":["giraffe gazelle"],"Nyala":["antelope"],"Bushbuck":["antelope"],"Bongo":["antelope"],"Grant's gazelle":["gazelle","grants gazelle"],
+  "Hartebeest":["kongoni"],"Klipspringer":["antelope"],"Steenbok":["steinbok","antelope"],"Duiker":["common duiker","antelope"],"Reedbuck":["antelope"],
+  "Red lechwe":["lechwe","antelope"],"Black wildebeest":["wildebeest","gnu","white tailed gnu"],"Grevy's zebra":["zebra","grevys zebra"],"Okapi":["forest giraffe"],
+  "Bushpig":["bush pig","pig","hog"],"Brown hyena":["hyena","hyaena","strandwolf"],"Striped hyena":["hyena","hyaena"],"Cape fox":["fox","silver backed fox"],
+  "African golden wolf":["golden wolf","golden jackal","wolf","jackal"],"Ethiopian wolf":["wolf","simien wolf","abyssinian wolf"],"Banded mongoose":["mongoose"],
+  "Dwarf mongoose":["mongoose"],"Springhare":["springhaas","spring hare"],"Porcupine":["crested porcupine","cape porcupine"],"Cape fur seal":["fur seal","seal"],
+  "Gelada":["gelada baboon","bleeding heart monkey","baboon"],"Red colobus":["colobus","monkey"],"Blue monkey":["monkey","sykes monkey"],"Red-tailed monkey":["monkey","redtail monkey"],
+  "Patas monkey":["monkey","hussar monkey"],"De Brazza's monkey":["monkey","de brazza monkey","debrazza"],"Bonobo":["pygmy chimpanzee","ape"],
+  "Kori bustard":["bustard","kori"],"Ground hornbill":["southern ground hornbill","hornbill"],"Shoebill":["shoebill stork","whalehead","shoe bill"],
+  "Martial eagle":["eagle"],"Tawny eagle":["eagle"],"Lappet-faced vulture":["vulture","nubian vulture"],"Eagle-owl":["giant eagle owl","verreauxs eagle owl","owl"],
+  "Go-away-bird":["grey go away bird","gray go away bird","lourie"],"Lovebird":["fischers lovebird","love bird"],"African grey parrot":["grey parrot","gray parrot","parrot"],
+  "Purple roller":["roller"],"Malachite kingfisher":["kingfisher"],"Pied kingfisher":["kingfisher"],"Carmine bee-eater":["bee eater","southern carmine bee eater"],
+  "Superb starling":["starling"],"Oxpecker":["red billed oxpecker","tick bird"],"Red bishop":["southern red bishop","bishop bird"],"Widowbird":["long tailed widowbird","widow bird"],
+  "Whydah":["pin tailed whydah"],"Paradise flycatcher":["flycatcher","african paradise flycatcher"],"Crimson-breasted shrike":["shrike","crimson breasted shrike"],
+  "Sunbird":["malachite sunbird"],"Hoopoe":["hoopoe bird"],"Wood hoopoe":["green wood hoopoe","woodhoopoe"],"Jacana":["african jacana","lily trotter","jesus bird"],
+  "Blacksmith lapwing":["lapwing","plover","blacksmith plover"],"Crowned lapwing":["lapwing","plover","crowned plover"],"Spoonbill":["african spoonbill"],
+  "Hadeda ibis":["hadeda","hadada","ibis"],"Sacred ibis":["ibis"],"Yellow-billed stork":["stork"],"Great white pelican":["pelican","white pelican"],
+  "Lesser flamingo":["flamingo"],"African darter":["darter","snakebird","anhinga"],"Cattle egret":["egret"],"Black-headed heron":["heron"],
+  "Crested guineafowl":["guineafowl","guinea fowl"],"Laughing dove":["dove"],"Red-billed hornbill":["hornbill"],"Trumpeter hornbill":["hornbill"],
+  "Purple-crested turaco":["turaco","lourie"],"Sociable weaver":["weaver","weaver bird"],"Buffalo weaver":["weaver","red billed buffalo weaver"],
+  "Leopard tortoise":["tortoise"],"Rock python":["python","african rock python","snake"],"Black mamba":["mamba","snake"],"Boomslang":["snake","tree snake"],
+  "Cape cobra":["cobra","snake"],"Gaboon viper":["gabon viper","viper","snake","adder"],"Rock monitor":["monitor","monitor lizard","white throated monitor","lizard"],
+  "Jackson's chameleon":["chameleon","three horned chameleon","jacksons chameleon"],"Bullfrog":["african bullfrog","frog"],"Dung beetle":["beetle","scarab"],
+  "Mopane worm":["caterpillar","mopane caterpillar","emperor moth caterpillar"],"African monarch":["plain tiger","butterfly","monarch"],
+  "Citrus swallowtail":["swallowtail","butterfly","christmas butterfly"],"Golden orb spider":["golden orb weaver","orb weaver","banana spider","spider"],
+  "Giant millipede":["millipede","shongololo"],
+  "White rhino":["rhino","white rhinoceros","square lipped rhino","rhinoceros"],"Lichtenstein's hartebeest":["hartebeest","lichtensteins hartebeest"],
+  "Sharpe's grysbok":["grysbok","sharpes grysbok","antelope"],"Red duiker":["duiker","natal red duiker","antelope"],"Mountain reedbuck":["reedbuck","antelope"],
+  "Chacma baboon":["baboon"],"Thick-tailed bushbaby":["bushbaby","bush baby","galago","greater galago"],"Spotted-necked otter":["otter","spotted necked otter"],
+  "Slender mongoose":["mongoose"],"White-tailed mongoose":["mongoose"],"Large-spotted genet":["genet","rusty spotted genet"],"Side-striped jackal":["jackal"],
+  "African wildcat":["wildcat","wild cat"],"Tree squirrel":["squirrel","bush squirrel"],"Scrub hare":["hare","rabbit"],"Epauletted fruit bat":["fruit bat","bat"],
+  "Grey hornbill":["hornbill","african grey hornbill","gray hornbill"],"Crowned hornbill":["hornbill"],"Brown snake eagle":["snake eagle","eagle"],
+  "Wahlberg's eagle":["eagle","wahlbergs eagle"],"African hawk-eagle":["hawk eagle","eagle"],"Long-crested eagle":["eagle","long crested eagle"],
+  "Black-winged kite":["kite","black shouldered kite"],"Yellow-billed kite":["kite","black kite"],"White-backed vulture":["vulture"],"Hooded vulture":["vulture"],
+  "White-headed vulture":["vulture"],"Spotted eagle-owl":["eagle owl","owl"],"Barn owl":["owl"],"Pel's fishing owl":["fishing owl","owl","pels fishing owl"],
+  "White-faced owl":["owl","white faced scops owl"],"Pearl-spotted owlet":["owlet","owl"],"Brown-hooded kingfisher":["kingfisher"],"Woodland kingfisher":["kingfisher"],
+  "Giant kingfisher":["kingfisher"],"White-fronted bee-eater":["bee eater"],"European bee-eater":["bee eater"],"European roller":["roller"],"Broad-billed roller":["roller"],
+  "Blue-eared starling":["starling","greater blue eared starling","glossy starling"],"Burchell's starling":["starling","burchells starling","glossy starling"],
+  "Violet-backed starling":["starling","amethyst starling","plum coloured starling"],"Red-winged starling":["starling"],"Magpie shrike":["shrike","long tailed shrike"],
+  "Fork-tailed drongo":["drongo"],"Black-collared barbet":["barbet"],"Crested barbet":["barbet"],"Golden-tailed woodpecker":["woodpecker"],"Red-billed quelea":["quelea"],
+  "Village weaver":["weaver","weaver bird"],"Red-billed firefinch":["firefinch","finch"],"Blue waxbill":["waxbill","cordon bleu"],"Yellow-throated longclaw":["longclaw"],
+  "Water thick-knee":["thick knee","dikkop","water dikkop"],"Spotted thick-knee":["thick knee","dikkop"],"Black-winged stilt":["stilt"],"Wattled lapwing":["lapwing","plover"],
+  "Grey heron":["heron","gray heron"],"Purple heron":["heron"],"Squacco heron":["heron"],"Little egret":["egret"],"African openbill":["openbill","stork"],
+  "Black stork":["stork"],"White stork":["stork"],"Spur-winged goose":["goose"],"Whistling duck":["white faced duck","white faced whistling duck","duck"],
+  "Knob-billed duck":["comb duck","duck"],"Crested francolin":["francolin"],"Natal spurfowl":["spurfowl","francolin"],"Sandgrouse":["double banded sandgrouse"],
+  "Green pigeon":["african green pigeon","pigeon"],"Brown-headed parrot":["parrot"],"Meyer's parrot":["parrot","meyers parrot"],"Burchell's coucal":["coucal","rainbird"],
+  "Red-crested korhaan":["korhaan","bustard"],"Paradise whydah":["whydah"],"Scarlet-chested sunbird":["sunbird"],"Common fiscal":["fiscal","fiscal shrike","shrike","butcher bird"],
+  "Helmetshrike":["white crested helmetshrike","helmet shrike"],"Mozambique spitting cobra":["spitting cobra","cobra","snake"],"Spotted bush snake":["bush snake","snake","green snake"],
+  "Hinged tortoise":["tortoise"],"Tree agama":["agama","blue headed agama","lizard"],"Flat lizard":["lizard","common flat lizard"],"Striped skink":["skink","lizard"],
+  "Giant plated lizard":["plated lizard","lizard"],"Foam nest frog":["frog","grey tree frog","foam nest tree frog"],"Guttural toad":["toad"],"Painted reed frog":["reed frog","frog"],
+  "Antlion":["ant lion","doodlebug","lacewing"],"Toktokkie beetle":["toktokkie","beetle"],"Blister beetle":["beetle"],"Rhinoceros beetle":["beetle","rhino beetle"],
+  "Foam grasshopper":["grasshopper","koppie foam grasshopper"],"Elegant grasshopper":["grasshopper"],"Rain spider":["huntsman spider","spider","huntsman"],
+  "Thick-tailed scorpion":["scorpion"],"Carpenter bee":["bee"],"Tigerfish":["tiger fish","fish"],"Mozambique tilapia":["tilapia","bream","fish"],
+  "Orca":["killer whale","whale"],"Sperm whale":["whale","cachalot"],"Narwhal":["narwhale","unicorn whale"],"Walrus":["walrus"],"Manatee":["sea cow"],
+  "Dugong":["sea cow"],"Leopard seal":["seal"],"Hammerhead shark":["hammerhead","shark"],"Whale shark":["shark"],"Nurse shark":["shark"],
+  "Stingray":["ray","sting ray","blue spotted stingray","bluespotted ribbontail ray"],"Eagle ray":["ray","spotted eagle ray"],"Sawfish":["saw fish","sawshark"],
+  "Ocean sunfish":["sunfish","mola","mola mola"],"Bluefin tuna":["tuna","tunny","atlantic bluefin tuna"],"Atlantic salmon":["salmon"],"Halibut":["atlantic halibut","flatfish"],
+  "Mackerel":["atlantic mackerel"],"Herring":["atlantic herring"],"Lionfish":["lion fish","turkeyfish","firefish"],"Humphead wrasse":["napoleon wrasse","maori wrasse","wrasse","napoleon fish"],
+  "Parrotfish":["parrot fish"],"Pufferfish":["puffer","puffer fish","blowfish","fugu"],"Boxfish":["box fish","cowfish","trunkfish","yellow boxfish"],
+  "Triggerfish":["trigger fish","clown triggerfish"],"Butterflyfish":["butterfly fish"],"Emperor angelfish":["angelfish","angel fish"],
+  "Blue tang":["tang","surgeonfish","dory","regal tang","palette surgeonfish"],"Moorish idol":["idol"],"Stonefish":["stone fish"],
+  "Leafy sea dragon":["sea dragon","leafy seadragon","seadragon"],"Garden eel":["eel"],"Sea urchin":["urchin"],"Nudibranch":["sea slug"],"Giant clam":["clam"],
+  "Nautilus":["chambered nautilus"],"Squid":["bigfin reef squid"],"Blue-ringed octopus":["octopus","blue ringed octopus"],"Hermit crab":["crab"],
+  "Spiny lobster":["lobster","crayfish","rock lobster","crawfish"],"Krill":["antarctic krill","shrimp"],"Brain coral":["coral"],"Sea anemone":["anemone","beadlet anemone"],
+  "Portuguese man o' war":["man o war","man of war","bluebottle","portuguese man of war"],"Horseshoe crab":["horseshoe"],"Scallop":["king scallop","great scallop"],
+  "Christmas tree worm":["worm","tube worm"],"Marine iguana":["iguana"],"Sea snake":["sea krait","banded sea krait","snake"],"Hawksbill turtle":["hawksbill","sea turtle","turtle"],
+  "Cape grysbok":["grysbok","antelope"],"Blesbok":["blesbuck","antelope"],"Bontebok":["bontebuck","antelope"],"Cape mountain zebra":["mountain zebra","zebra"],
+  "Grey rhebok":["rhebok","vaal rhebok","gray rhebok","antelope"],"Oribi":["antelope"],"Suni":["antelope"],"Southern right whale":["right whale","whale"],
+  "Black-footed cat":["small spotted cat","black footed cat","wildcat"],"Blue crane":["crane","stanley crane","paradise crane"],"Wattled crane":["crane"],
+  "Southern bald ibis":["bald ibis","ibis"],"Bearded vulture":["lammergeier","lammergeyer","vulture"],"Verreaux's eagle":["black eagle","verreauxs eagle","eagle"],
+  "Jackal buzzard":["buzzard"],"Pale chanting goshawk":["chanting goshawk","goshawk"],"African harrier-hawk":["gymnogene","harrier hawk"],"Amur falcon":["falcon"],
+  "Ludwig's bustard":["bustard","ludwigs bustard"],"Northern black korhaan":["black korhaan","korhaan"],"Cape sugarbird":["sugarbird"],
+  "Orange-breasted sunbird":["sunbird"],"Cape weaver":["weaver","weaver bird"],"Pied crow":["crow"],"Cape robin-chat":["robin chat","cape robin","robin"],
+  "Southern masked weaver":["masked weaver","weaver","weaver bird"],"Bokmakierie":["bush shrike","bushshrike"],"Knysna turaco":["knysna lourie","lourie","turaco"],
+  "Narina trogon":["trogon"],"Cape gannet":["gannet"],"African oystercatcher":["black oystercatcher","oystercatcher"],"Cape eagle-owl":["eagle owl","owl"],
+  "Marsh owl":["owl"],"Yellow-billed duck":["duck"],"Red-knobbed coot":["coot","crested coot"],"Black-headed oriole":["oriole"],
+  "Red-faced mousebird":["mousebird","mouse bird"],"Sparrow-weaver":["white browed sparrow weaver","sparrow weaver","weaver"],"Swallow-tailed bee-eater":["bee eater"],
+  "Cape rockjumper":["rockjumper","rock jumper"],"Rinkhals":["ringhals","spitting cobra","snake"],"Angulate tortoise":["bowsprit tortoise","tortoise"],
+  "Armadillo girdled lizard":["armadillo lizard","girdled lizard","lizard"],"Sungazer":["giant girdled lizard","ouvolk","lizard"],"Namaqua chameleon":["chameleon"],
+  "Cape dwarf chameleon":["dwarf chameleon","chameleon"],"Western leopard toad":["leopard toad","toad"],"Garden acraea":["acraea","butterfly"],
+  "Armoured cricket":["armored cricket","corn cricket","koringkriek","cricket"],"Dotted border butterfly":["common dotted border","dotted border","butterfly"],"Baboon spider":["tarantula","spider"],"Emperor scorpion":["scorpion"],"Nile crocodile":["crocodile","croc"],"Chameleon":["flap necked chameleon"],
+  "Toucan":["keel billed toucan"],"Hummingbird":["humming bird"],"Kingfisher":["green kingfisher"],"Puffin":["atlantic puffin"],"Woodpecker":["downy woodpecker"],
+  "Robin":["robin redbreast","european robin"],"Seagull":["gull","herring gull"],"Pigeon":["dove","rock dove"],"Pelican":["brown pelican"],"Egret":["heron","great egret"],
+  "Snowy owl":["owl"],"Bee":["honey bee","honeybee"],"Bumblebee":["bumble bee","bee"],"Dragonfly":["emperor dragonfly"],"Praying mantis":["mantis"],
+  "Grasshopper":["locust","cricket"],"Spider":["jumping spider"],"Jellyfish":["moon jellyfish","jelly fish"],"Starfish":["sea star","crown of thorns"],
+  "Seahorse":["sea horse"],"Clownfish":["clown fish","nemo","anemonefish"],"Manta ray":["manta","ray","stingray"],"Komodo dragon":["komodo"],"Iguana":["green iguana","lizard"],
+  "Gecko":["day gecko","lizard"],"Rattlesnake":["rattler","snake"],"Cobra":["snake"],"Tortoise":["giant tortoise","galapagos tortoise"],"Toad":["frog"],
+  "Cuttlefish":["cuttle fish"],"Mantis shrimp":["peacock mantis shrimp"],"Kangaroo":["roo","grey kangaroo"],"Squirrel":["red squirrel"],"Chipmunk":["squirrel"],
+  "Sloth":["three toed sloth"],"Ibex":["mountain goat","goat"],"Snow leopard":["snow leopard"],"Jaguar":["jaguar"],"Puma":["cougar","mountain lion"],
+  "Lynx":["bobcat","iberian lynx"],"Tapir":["tapir"],"Capybara":["capibara"],"Platypus":["duck billed platypus"],"Wombat":["wombat"],"Sea lion":["sealion"],
+  "Reindeer":["caribou"],"Donkey":["ass","burro"],"Seal":["harbour seal","harbor seal","common seal"],"Echidna":["spiny anteater"],"Tarsier":["tarsier"],
+  "Yak":["yak"],"Musk ox":["muskox"],"Proboscis monkey":["monkey"]
+};
+const norm=s=>(s||"").toLowerCase().replace(/[^a-z]/g,"").replace(/(es|s)$/,"");
+function lev(a,b){const d=Array.from({length:a.length+1},(_,i)=>[i]);for(let j=1;j<=b.length;j++)d[0][j]=j;
+  for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[a.length][b.length];}
+function isMatch(guess,item){
+  const g=norm(guess.replace(/^\s*(an?|the)\s+/i,""));if(!g)return false;
+  return [item.name,...(ALIASES[item.name]||[])].some(n=>{const t=norm(n);const tol=t.length>=8?2:t.length>=4?1:0;return lev(g,t)<=tol;});
+}
+// 2 = exact name (letters only, ignoring case, spaces and punctuation), 1 = accepted (typo, plural or nickname), 0 = wrong
+const letters=s=>(s||"").toLowerCase().replace(/^\s*(an?|the)\s+/,"").replace(/[^a-z]/g,"");
+function matchLevel(guess,item){
+  if(!isMatch(guess,item))return 0;
+  return letters(guess)===letters(item.name)?2:1;
+}
+const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];}return a;};
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- game flow ---------- */
+// Shown when photos can't be found, e.g. index.html opened from inside the zip without unzipping the whole folder.
+function showPhotoWarning(){
+  if(document.getElementById("photoWarn"))return;
+  const w=document.createElement("div");w.id="photoWarn";w.setAttribute("role","alert");
+  w.style.cssText="background:var(--bad);color:#2a0400;padding:12px 16px;border-radius:12px;font-weight:600;line-height:1.4";
+  w.textContent="The animal photos can't be found. If you downloaded the game, unzip the whole zoom-safari folder first and open index.html from inside it, so the photos folder sits next to it.";
+  document.querySelector(".wrap").insertBefore(w,document.querySelector(".wrap").children[1]);
+}
+function buildDeck(){
+  const ph=shuffle(photos).map(p=>({...p,photo:true}));
+  const pool=cfg.pool==="all"||!cfg.pool?ANIMALS:ANIMALS.filter(a=>hasTag(a,cfg.pool));
+  const deck=[...ph,...shuffle(pool)].slice(0,cfg.rounds);
+  deck.forEach(d=>{const im=new Image();im.onerror=()=>{if(!d.photo||!String(d.src).startsWith("blob:"))showPhotoWarning();};im.src=d.src;d.img=im;});
+  return deck;
+}
+
+function startGame(){
+  cfg.names=cfg.names.map((n,i)=>(n||"").trim()||DEFAULT_NAMES[i]);
+  G={players:Array.from({length:cfg.n},(_,i)=>({name:cfg.names[i],color:COLORS[i],key:KEYS[i],score:0})),
+     deck:buildDeck(),round:-1};
+  $("setup").hidden=true;$("final").hidden=true;$("game").hidden=false;
+  renderBuzzers();tone(520,.08,"triangle",.05);
+  nextRound();
+}
+$("startBtn").addEventListener("click",startGame);
+$("againBtn").addEventListener("click",startGame);
+$("setupBtn").addEventListener("click",()=>{$("final").hidden=true;$("setup").hidden=false;$("roundinfo").textContent="Who spots it first?";});
+
+function nextRound(){
+  G.round++;
+  if(G.round>=G.deck.length)return finish();
+  const item=G.deck[G.round];
+  const R={item,locked:new Set(),state:"zooming",elapsed:0,buzzer:null,answerLeft:0,
+    focus:{x:.5,y:.5},z0:6.5+Math.random()*3.5};
+  R.state="loading";
+  const go=()=>{if(G.R!==R)return;R.focus=pickFocus(item.img);R.state="zooming";last=performance.now();renderBuzzers();};
+  (item.img.decode?item.img.decode():Promise.resolve()).then(go,go);
+  G.R=R;
+  const s=$("subject");
+  s.innerHTML=`<img alt="">`;s.firstChild.src=item.src;
+  $("revealCredit").innerHTML=item.page?`Photo: ${esc(item.artist)}${item.license?" · "+esc(item.license):""} · <a href="${item.page}" target="_blank" rel="noopener">Wikimedia Commons</a>`:"";
+  $("reveal").classList.remove("show");
+  $("recLabel").textContent="LIVE";
+  $("roundinfo").textContent=`Animal ${G.round+1} of ${G.deck.length}`;
+  renderScores();renderStatus();renderBuzzers();
+  last=performance.now();
+}
+
+// Choose a fresh close-up spot each round: weighted toward detailed, in-focus areas (fur, eyes, markings)
+// near the middle of the frame, where the animal usually is, and away from smooth or blurred background.
+function pickFocus(img){
+  const fallback={x:.3+Math.random()*.4,y:.3+Math.random()*.4};
+  try{
+    if(!img||!img.naturalWidth)return fallback;
+    const W=96,H=Math.max(16,Math.round(W*img.naturalHeight/img.naturalWidth));
+    const c=document.createElement("canvas");c.width=W;c.height=H;
+    const x=c.getContext("2d",{willReadFrequently:true});x.drawImage(img,0,0,W,H);
+    const d=x.getImageData(0,0,W,H).data,L=new Float32Array(W*H);
+    for(let i=0;i<W*H;i++)L[i]=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
+    const w=[];let sum=0;
+    for(let y=2;y<H-2;y++)for(let X=2;X<W-2;X++){
+      const nx=X/W,ny=y/H;if(nx<.12||nx>.88||ny<.12||ny>.88)continue;
+      const i=y*W+X,g=Math.abs(L[i+1]-L[i-1])+Math.abs(L[i+W]-L[i-W])+Math.abs(L[i+2]-L[i-2])*.5+Math.abs(L[i+2*W]-L[i-2*W])*.5;
+      const dx=nx-.5,dy=ny-.5,centre=Math.exp(-(dx*dx+dy*dy)/(2*.26*.26));
+      const v=Math.pow(g,1.6)*centre;sum+=v;w.push([v,nx,ny]);
+    }
+    if(!sum)return fallback;
+    let r=Math.random()*sum;
+    for(const [v,nx,ny] of w){r-=v;if(r<=0)return{x:Math.min(.88,Math.max(.12,nx+(Math.random()-.5)/W)),y:Math.min(.88,Math.max(.12,ny+(Math.random()-.5)/H))};}
+    return fallback;
+  }catch(e){return fallback;}
+}
+function progress(){return Math.min(1,G.R.elapsed/cfg.speed);}
+function worth(){return Math.round(100+900*Math.pow(1-progress(),1.3));}
+
+function drawSubject(){
+  const R=G.R,F=$("finder"),W=F.clientWidth;
+  const p=R.state==="reveal"?1:progress();
+  const ease=p; // zoom is exponential in scale, which already feels even
+  const zoom=Math.pow(R.z0,1-ease);
+  const im=R.item.img,ar=im&&im.naturalWidth?im.naturalWidth/im.naturalHeight:1.5;
+  const bw=W*zoom*Math.min(1,ar), bh=W*zoom*Math.min(1,1/ar);
+  // keep the focus point centred early, drifting to the full picture centred at the end
+  const t=(R.z0-zoom)/(R.z0-1);
+  const fx=R.focus.x+(0.5-R.focus.x)*t, fy=R.focus.y+(0.5-R.focus.y)*t;
+  const s=$("subject").style;
+  s.width=bw+"px";s.height=bh+"px";s.left=(W/2-fx*bw)+"px";s.top=(W/2-fy*bh)+"px";
+  $("zoomLabel").textContent=zoom.toFixed(1)+"×";
+  $("meter").style.transform=`scaleX(${R.state==="reveal"?0:1-Math.min(1,R.elapsed/(cfg.speed+LINGER))})`;
+  $("worthLabel").textContent=R.state==="reveal"?"Round over":`Worth ${worth()}`;
+}
+
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(.1,(now-last)/1000);last=now;
+  if(G&&G.R&&!$("game").hidden){
+    const R=G.R;
+    if(R.state==="zooming"){
+      R.elapsed+=dt;
+      if(R.elapsed>=cfg.speed+LINGER)endRound(null);
+    }else if(R.state==="buzzed"){
+      R.answerLeft-=dt;
+      const c=document.querySelector(".answerclock i");if(c)c.style.transform=`scaleX(${Math.max(0,R.answerLeft/ANSWER_TIME)})`;
+      if(R.answerLeft<=0)answer(null);
+    }
+    drawSubject();
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function buzz(i){
+  const R=G&&G.R;if(!R||R.state!=="zooming"||R.locked.has(i))return;
+  R.state="buzzed";R.buzzer=i;R.answerLeft=ANSWER_TIME;R.buzzWorth=worth();
+  $("recLabel").textContent="PAUSED";sfx.buzz();
+  renderScores();renderStatus();renderBuzzers();
+}
+function answer(text){
+  const R=G.R;if(R.state!=="buzzed")return;
+  const p=G.players[R.buzzer];const form=document.querySelector(".guess");
+  const inp=form&&form.querySelector("input");if(inp)inp.readOnly=true;
+  const lvl=text!=null?matchLevel(text,R.item):0;
+  if(lvl){
+    R.exact=lvl===2;R.gained=R.buzzWorth*lvl;
+    p.score+=R.gained;p.correct=(p.correct||0)+1;if(R.exact)p.exactCount=(p.exactCount||0)+1;sfx.right();if(R.exact)tone(1760,.3,"triangle",.1,.35);
+    if(form)form.classList.add("right");
+    setTimeout(()=>endRound(R.buzzer),550);
+    R.state="judging";
+  }else{
+    p.score-=150;sfx.wrong();R.locked.add(R.buzzer);
+    if(form)form.classList.add("wrong");
+    R.state="judging";
+    const why=text==null||!text.trim()?"ran out of time":`guessed "${esc(text.trim())}", which is wrong`;
+    setTimeout(()=>{
+      if(R.locked.size>=G.players.length)return endRound(null);
+      R.state="zooming";R.buzzer=null;$("recLabel").textContent="LIVE";
+      renderScores();renderStatus(`${esc(p.name)} ${why}. Keep watching!`);renderBuzzers();
+    },800);
+  }
+  renderScores();
+}
+function endRound(winner){
+  const R=G.R;R.state="reveal";R.winner=winner;sfx.reveal();
+  $("recLabel").textContent="DONE";
+  $("revealName").textContent=R.item.name;
+  $("revealWho").textContent=winner!=null?`${G.players[winner].name} got it, +${R.gained}${R.exact?" (exact name, double points!)":""}`:(G.players.length===1?"Missed this one":"Nobody got this one");
+  $("reveal").classList.add("show");
+  renderScores();renderStatus();renderBuzzers();
+}
+function finish(){
+  $("game").hidden=true;$("final").hidden=false;
+  const ranked=[...G.players].sort((a,b)=>b.score-a.score);
+  const top=ranked.filter(p=>p.score===ranked[0].score);
+  if(G.players.length===1){
+    const p=G.players[0],n=G.deck.length,c=p.correct||0,x=p.exactCount||0;
+    // personal best per animal set, round count and zoom speed, kept in this browser only
+    const key=`zs-best-${cfg.pool||"all"}-${n}-${cfg.speed}`;let best=null;
+    try{best=JSON.parse(localStorage.getItem(key)||"null");}catch(e){}
+    const isBest=best==null||p.score>best;
+    if(isBest){try{localStorage.setItem(key,JSON.stringify(p.score));}catch(e){}}
+    $("winnerLine").textContent=`${p.name}: ${p.score} points`;
+    $("podium").innerHTML=`<div class="score"><span class="bar" style="background:${p.color}"></span><span class="nm">Animals named</span><span class="pts">${c} / ${n}</span></div>
+      <div class="score"><span class="bar" style="background:var(--accent)"></span><span class="nm">Exact names (double points)</span><span class="pts">${x}</span></div>
+      <div class="score"><span class="bar" style="background:var(--ok)"></span><span class="nm">${isBest?(best==null?"First score for this setup":"New personal best!"):"Personal best"}</span><span class="pts">${isBest?p.score:best}</span></div>`;
+    $("roundinfo").textContent="Final score";sfx.right();return;
+  }
+  $("winnerLine").textContent=top.length>1?`It's a tie: ${top.map(p=>p.name).join(" & ")}`:`${ranked[0].name} wins!`;
+  $("podium").innerHTML=ranked.map((p,i)=>`<div class="score"><span class="bar" style="background:${p.color}"></span><span class="nm">${i+1}. ${esc(p.name)}</span><span class="pts">${p.score}</span></div>`).join("");
+  $("roundinfo").textContent="Final scores";
+  sfx.right();
+}
+
+/* ---------- rendering ---------- */
+function renderScores(){
+  const R=G.R;
+  $("scores").innerHTML=G.players.map((p,i)=>`<div class="score ${R&&R.locked.has(i)&&R.state!=="reveal"?"locked":""} ${R&&R.buzzer===i&&R.state!=="zooming"&&R.state!=="reveal"?"active":""}">
+    <span class="bar" style="background:${p.color}"></span>
+    <span class="nm">${esc(p.name)}${R&&R.locked.has(i)&&R.state!=="reveal"?'<span class="tag">locked</span>':""}</span>
+    <span class="pts">${p.score}</span></div>`).join("");
+}
+function renderStatus(msg){
+  const R=G.R,el=$("status");
+  if(R.state==="buzzed"){
+    const p=G.players[R.buzzer];
+    el.innerHTML=`<div class="msg" style="color:${p.color}">${esc(p.name)}, what animal is it?</div>
+      <div class="answerclock"><i></i></div>
+      <form class="guess" id="guessForm" autocomplete="off"><input id="guessInput" type="text" placeholder="Type the animal…" aria-label="Your guess" autocapitalize="off" spellcheck="false"><button type="submit">Guess</button></form>`;
+    $("guessForm").addEventListener("submit",e=>{e.preventDefault();const v=$("guessInput").value;if(v.trim())answer(v);});
+    setTimeout(()=>{const i=$("guessInput");if(i)i.focus();},0);
+    el.classList.remove("flash");void el.offsetWidth;el.classList.add("flash");
+  }else if(R.state==="reveal"){
+    const lastOne=G.round>=G.deck.length-1;
+    el.innerHTML=`<div class="msg">It was the <b>${esc(R.item.name.toLowerCase())}</b>.</div>
+      <button class="big" type="button" id="nextBtn">${lastOne?"See final scores":"Next animal"}</button>
+      <div class="note">or press <kbd>Space</kbd></div>`;
+    $("nextBtn").addEventListener("click",nextRound);
+  }else{
+    el.innerHTML=`<div class="msg">${msg||"Look closely… buzz as soon as you know it."}</div>
+      <div class="note">${G.players.map((p,i)=>R.locked.has(i)?"":`<kbd>${p.key.toUpperCase()}</kbd> ${esc(p.name)}`).filter(Boolean).join(" &nbsp; ")}</div>`;
+  }
+}
+function renderBuzzers(){
+  const R=G.R,box=$("buzzers");box.style.setProperty("--n",G.players.length);
+  box.innerHTML=G.players.map((p,i)=>`<button class="buzz" type="button" data-i="${i}" style="background:${p.color}"
+    ${!R||R.state!=="zooming"||R.locked.has(i)?"disabled":""}>${esc(p.name)}<small>BUZZ · ${p.key.toUpperCase()}</small></button>`).join("");
+  box.querySelectorAll(".buzz").forEach(b=>b.addEventListener("pointerdown",e=>{e.preventDefault();buzz(+b.dataset.i);}));
+}
+
+document.addEventListener("keydown",e=>{
+  if($("game").hidden||!G||!G.R)return;
+  if(e.target.tagName==="INPUT")return;
+  const k=e.key.toLowerCase(),R=G.R;
+  const pi=G.players.findIndex(p=>p.key===k);
+  if(pi>=0){e.preventDefault();buzz(pi);return;}
+  if((k===" "||k==="enter")&&R.state==="reveal"){e.preventDefault();nextRound();}
+});
+window.addEventListener("resize",()=>{if(G&&G.R)drawSubject();});
+</script>
+</body></html>
